@@ -1,0 +1,212 @@
+# Requirements: Podland
+
+**Defined:** 2026-03-25
+**Core Value:** Students can deploy and run applications with zero DevOps knowledge — just create a "VM", get auto-configured domain and tunnel, and focus on code.
+
+---
+
+## v1 Requirements
+
+Requirements for initial launch. Each maps to roadmap phases.
+
+### Authentication
+
+- [ ] **AUTH-01**: User can sign in via GitHub OAuth
+- [ ] **AUTH-02**: System validates GitHub email matches @student.unand.ac.id pattern
+- [ ] **AUTH-03**: System extracts NIM from email and assigns role (Internal if NIM contains 1152, External otherwise)
+- [ ] **AUTH-04**: User session persists across browser refresh (JWT with 7-day expiry)
+- [ ] **AUTH-05**: User can view their profile (display name, role, NIM, quota usage)
+- [ ] **AUTH-06**: User can sign out (session invalidation)
+
+### VM Management
+
+- [ ] **VM-01**: User can create a new VM with name, OS selection (Ubuntu 22.04 or Debian 12), and resource allocation (within quota)
+- [ ] **VM-02**: User can start a stopped VM
+- [ ] **VM-03**: User can stop a running VM
+- [ ] **VM-04**: User can restart a VM
+- [ ] **VM-05**: User can delete a VM (with confirmation)
+- [ ] **VM-06**: User can view VM list with status (running, stopped, pending, error)
+- [ ] **VM-07**: User can view VM detail page (resource usage, domain, created date)
+- [ ] **VM-08**: System enforces per-role resource quotas (Internal: 1 CPU/2GB RAM, External: 0.5 CPU/1GB RAM)
+- [ ] **VM-09**: System prevents VM creation if quota would be exceeded
+- [ ] **VM-10**: VM runs in isolated Kubernetes namespace with NetworkPolicy denying inter-namespace traffic
+- [ ] **VM-11**: VM container runs as non-root user with privilege escalation disabled
+
+### Domain & Networking
+
+- [ ] **DOMAIN-01**: System automatically assigns subdomain to VM (vm-name.podland.app)
+- [ ] **DOMAIN-02**: System creates Cloudflare DNS record via API when VM is created
+- [ ] **DOMAIN-03**: System creates Cloudflare Tunnel configuration for VM
+- [ ] **DOMAIN-04**: VM is accessible via HTTPS with automatic SSL certificate
+- [ ] **DOMAIN-05**: User can view list of their domains with VM mappings
+- [ ] **DOMAIN-06**: User can delete domain (removes DNS record and tunnel)
+
+### Resource Quotas
+
+- [ ] **QUOTA-01**: System tracks per-user resource usage (CPU, RAM, storage, VM count)
+- [ ] **QUOTA-02**: User can view quota usage in dashboard
+- [ ] **QUOTA-03**: System enforces hard limits (cannot exceed quota)
+- [ ] **QUOTA-04**: Superadmin can modify user quotas
+- [ ] **QUOTA-05**: System creates Kubernetes ResourceQuota per user namespace
+
+### Monitoring & Observability
+
+- [ ] **MON-01**: System collects CPU, RAM, disk, and network metrics for each VM
+- [ ] **MON-02**: User can view Grafana dashboard with VM metrics (last 24h, 7d, 30d)
+- [ ] **MON-03**: System aggregates logs from all VMs in Loki
+- [ ] **MON-04**: User can view VM logs in dashboard (last 1000 lines)
+- [ ] **MON-05**: System generates alerts when VM CPU > 90% for 5 minutes
+- [ ] **MON-06**: System generates alerts when VM RAM > 85% for 5 minutes
+
+### User Dashboard
+
+- [ ] **DASH-01**: User can view dashboard home with VM summary and quota usage
+- [ ] **DASH-02**: User can access create VM wizard
+- [ ] **DASH-03**: User can view recent activity log (VM created, started, stopped, deleted)
+- [ ] **DASH-04**: Dashboard is responsive (works on mobile and desktop)
+
+### Admin Panel
+
+- [ ] **ADMIN-01**: Superadmin can view list of all users with role filters
+- [ ] **ADMIN-02**: Superadmin can change user role (Internal ↔ External)
+- [ ] **ADMIN-03**: Superadmin can ban/unban users
+- [ ] **ADMIN-04**: Superadmin can view system health dashboard (cluster resources, active VMs)
+- [ ] **ADMIN-05**: System logs all admin actions to audit log
+
+### API
+
+- [ ] **API-01**: System provides REST API for all VM operations (create, start, stop, delete, list, get)
+- [ ] **API-02**: API requires authentication via API key
+- [ ] **API-03**: System provides OpenAPI/Swagger documentation
+- [ ] **API-04**: API enforces rate limiting (100 requests/minute per API key)
+
+---
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Advanced VM Features
+
+- **VM-12**: User can access VM console/terminal via web (WebSocket-based)
+- **VM-13**: User can create VM from custom template
+- **VM-14**: User can clone existing VM
+- **VM-15**: User can schedule VM start/stop (cron-based)
+- **VM-16**: System supports Windows OS templates
+
+### Advanced Domain Features
+
+- **DOMAIN-07**: User can configure custom domain (CNAME to Podland)
+- **DOMAIN-08**: User can manage DNS records (A, CNAME, MX, TXT) via UI
+- **DOMAIN-09**: User can upload custom SSL certificate
+
+### Advanced Monitoring
+
+- **MON-07**: User can define custom metrics
+- **MON-08**: System supports alert webhooks (Discord, Slack, email)
+- **MON-09**: System provides anomaly detection (ML-based)
+- **MON-10**: System shows cost estimation based on resource usage
+
+### Idle Detection & Auto-Delete
+
+- **IDLE-01**: System detects idle VMs (combined: no HTTP traffic + no process + no user login for 48h)
+- **IDLE-02**: System sends warning notification 24h before auto-delete
+- **IDLE-03**: System automatically deletes idle VM after grace period
+- **IDLE-04**: User can "pin" VM to prevent auto-delete
+
+### Integrations
+
+- **INT-01**: System provides Terraform provider for Podland
+- **INT-02**: System provides CLI tool for power users
+- **INT-03**: System provides GitHub App for auto-deploy on push
+- **INT-04**: System provides GraphQL API
+
+### Notifications
+
+- **NOTIF-01**: User receives in-app notifications for VM events
+- **NOTIF-02**: User receives email notifications for alerts
+- **NOTIF-03**: User can configure notification preferences
+
+---
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Real VM (qemu/kvm) | Contradicts shared-resource model, high overhead |
+| Multi-server cluster | Single-server constraint for v1 |
+| GPU acceleration | Niche use case, hardware limitation |
+| Managed database service | Out of scope, users can run their own in VMs |
+| Load balancer as service | Users can deploy their own (Traefik, NGINX) |
+| CI/CD pipeline service | Users can self-host (GitHub Actions, Drone) |
+| Mobile app | Web-first, mobile later |
+| Windows OS templates | Licensing complexity, resource-heavy |
+| Multi-region deployment | Single-server constraint |
+
+---
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| AUTH-05 | Phase 1 | Pending |
+| AUTH-06 | Phase 1 | Pending |
+| VM-01 | Phase 2 | Pending |
+| VM-02 | Phase 2 | Pending |
+| VM-03 | Phase 2 | Pending |
+| VM-04 | Phase 2 | Pending |
+| VM-05 | Phase 2 | Pending |
+| VM-06 | Phase 2 | Pending |
+| VM-07 | Phase 2 | Pending |
+| VM-08 | Phase 2 | Pending |
+| VM-09 | Phase 2 | Pending |
+| VM-10 | Phase 2 | Pending |
+| VM-11 | Phase 2 | Pending |
+| DOMAIN-01 | Phase 3 | Pending |
+| DOMAIN-02 | Phase 3 | Pending |
+| DOMAIN-03 | Phase 3 | Pending |
+| DOMAIN-04 | Phase 3 | Pending |
+| DOMAIN-05 | Phase 3 | Pending |
+| DOMAIN-06 | Phase 3 | Pending |
+| QUOTA-01 | Phase 2 | Pending |
+| QUOTA-02 | Phase 2 | Pending |
+| QUOTA-03 | Phase 2 | Pending |
+| QUOTA-04 | Phase 2 | Pending |
+| QUOTA-05 | Phase 2 | Pending |
+| MON-01 | Phase 4 | Pending |
+| MON-02 | Phase 4 | Pending |
+| MON-03 | Phase 4 | Pending |
+| MON-04 | Phase 4 | Pending |
+| MON-05 | Phase 4 | Pending |
+| MON-06 | Phase 4 | Pending |
+| DASH-01 | Phase 1 | Pending |
+| DASH-02 | Phase 2 | Pending |
+| DASH-03 | Phase 1 | Pending |
+| DASH-04 | Phase 1 | Pending |
+| ADMIN-01 | Phase 5 | Pending |
+| ADMIN-02 | Phase 5 | Pending |
+| ADMIN-03 | Phase 5 | Pending |
+| ADMIN-04 | Phase 5 | Pending |
+| ADMIN-05 | Phase 5 | Pending |
+| API-01 | Phase 2 | Pending |
+| API-02 | Phase 2 | Pending |
+| API-03 | Phase 2 | Pending |
+| API-04 | Phase 2 | Pending |
+
+**Coverage:**
+- v1 requirements: 48 total
+- Mapped to phases: 48
+- Unmapped: 0 ✓
+
+---
+
+*Requirements defined: 2026-03-25*
+*Last updated: 2026-03-25 after research synthesis*
