@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: podland
+  labels:
+    name: podland
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: podland
+type: Opaque
+stringData:
+  password: "podland_password_change_me_in_production"
