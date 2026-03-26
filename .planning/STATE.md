@@ -51,6 +51,7 @@ See: .planning/PROJECT.md (updated 2026-03-25 after initial questioning)
 
 | Date | Event |
 |------|-------|
+| 2026-03-26 | Quick task 260326-001: Debug Docker database test run - fixed Go version, DB password, missing root route |
 | 2026-03-25 | Project initialized via /ez:new-project |
 | 2026-03-25 | Research completed (stack, features, architecture, pitfalls) |
 | 2026-03-25 | Requirements defined (48 v1 requirements) |
@@ -86,6 +87,14 @@ None — Implementation complete, bugs fixed, ready for testing.
 
 ---
 
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260326-001 | Debug Docker database test run - fix Go version, DB password, missing root route | 2026-03-26 | 3a07d75 | [260326-001-docker-db-debug](./quick/260326-001-docker-db-debug/) |
+
+---
+
 ## Next Actions
 
 1. **Manual Testing** — Follow QUICKSTART.md to run and test
@@ -95,4 +104,4 @@ None — Implementation complete, bugs fixed, ready for testing.
 ---
 
 *State initialized: 2026-03-25*
-*Last updated: 2026-03-25 after roadmap creation*
+*Last updated: 2026-03-26 - Completed quick task 260326-001: Debug Docker database test run*
