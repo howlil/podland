@@ -6,13 +6,18 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/podland/backend/internal/auth"
 	"github.com/podland/backend/internal/database"
 )
 
 var db *sql.DB
+
+// welcomeSessions stores temporary welcome session data (token -> user ID)
+var welcomeSessions sync.Map
 
 // SetDB sets the database connection for handlers
 func SetDB(database *sql.DB) {
@@ -105,15 +110,26 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	// Check if user exists
 	user, err := dbWrapper.GetUserByGitHubID(githubUser.ID)
 	if err == sql.ErrNoRows {
-		// New user - download avatar
-		avatarData, err := auth.FetchAvatar(githubUser.AvatarURL)
+		// New user - download avatar only if not already saved
 		avatarURL := githubUser.AvatarURL // Fallback to GitHub URL
-
-		if err == nil {
-			// Save avatar locally
-			filePath := "uploads/avatars/" + githubUser.ID + ".jpg"
-			if os.WriteFile(filePath, avatarData, 0644) == nil {
-				avatarURL = "/uploads/avatars/" + githubUser.ID + ".jpg"
+		
+		// Sanitize filename to prevent path traversal
+		safeFilename := githubUser.ID
+		if idx := strings.LastIndex(safeFilename, "/"); idx != -1 {
+			safeFilename = safeFilename[idx+1:]
+		}
+		filePath := "uploads/avatars/" + safeFilename + ".jpg"
+		
+		// Only download if file doesn't exist
+		if _, statErr := os.Stat(filePath); os.IsNotExist(statErr) {
+			avatarData, fetchErr := auth.FetchAvatar(githubUser.AvatarURL)
+			if fetchErr == nil {
+				// Ensure directory exists
+				if mkdirErr := os.MkdirAll("uploads/avatars", 0755); mkdirErr == nil {
+					if writeErr := os.WriteFile(filePath, avatarData, 0644); writeErr == nil {
+						avatarURL = "/uploads/avatars/" + safeFilename + ".jpg"
+					}
+				}
 			}
 		}
 
@@ -134,8 +150,23 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 		// Log activity
 		_ = dbWrapper.CreateActivityLog(user.ID, "account_created", nil)
 
-		// Redirect to welcome screen
-		http.Redirect(w, r, "/auth/welcome?userId="+user.ID, http.StatusTemporaryRedirect)
+		// Create temporary welcome session (store user ID in session, not URL)
+		welcomeToken := uuid.New().String()
+		// Store in context for welcome route to retrieve (via session cookie)
+		http.SetCookie(w, &http.Cookie{
+			Name:     "welcome_token",
+			Value:    welcomeToken,
+			Path:     "/auth",
+			HttpOnly: true,
+			Secure:   os.Getenv("ENV") == "production",
+			SameSite: http.SameSiteStrictMode,
+			MaxAge:   300, // 5 minutes
+		})
+		// Store user ID mapped to token (in-memory for simplicity, could use Redis)
+		welcomeSessions.Store(welcomeToken, user.ID)
+
+		// Redirect to welcome screen (no user ID in URL)
+		http.Redirect(w, r, "/auth/welcome", http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -214,11 +245,15 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get session from request (if exists)
-	sessionID := r.Context().Value("session_id")
-	if sessionID != nil {
+	// Get refresh token from cookie and revoke session
+	refreshCookie, err := r.Cookie("refresh_token")
+	if err == nil && refreshCookie.Value != "" {
 		dbWrapper := database.NewDB(db)
-		_ = dbWrapper.RevokeSession(sessionID.(string), time.Now())
+		refreshHash := auth.HashToken(refreshCookie.Value)
+		session, err := dbWrapper.GetSessionByRefreshToken(refreshHash)
+		if err == nil && session.ID != "" {
+			_ = dbWrapper.RevokeSession(session.ID, time.Now())
+		}
 	}
 
 	// Clear cookies
@@ -231,9 +266,12 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 // Helper functions
 
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header
+	// Check X-Forwarded-For header - only trust first IP to prevent spoofing
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return xff
+		// Take the first IP in the chain (client IP)
+		if ips := strings.Split(xff, ","); len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
 	}
 	// Fall back to RemoteAddr
 	ip := r.RemoteAddr
@@ -301,4 +339,30 @@ func clearAuthCookies(w http.ResponseWriter) {
 func generateAccessToken(user *database.User) string {
 	token, _ := auth.GenerateAccessToken(user.ID, user.Email)
 	return token
+}
+
+// HandleGetWelcomeUser returns user data for welcome screen (uses welcome_token cookie)
+func HandleGetWelcomeUser(w http.ResponseWriter, r *http.Request) {
+	welcomeCookie, err := r.Cookie("welcome_token")
+	if err != nil {
+		http.Error(w, "No welcome session", http.StatusNotFound)
+		return
+	}
+
+	userIDInterface, ok := welcomeSessions.Load(welcomeCookie.Value)
+	if !ok {
+		http.Error(w, "Welcome session expired", http.StatusGone)
+		return
+	}
+
+	userID := userIDInterface.(string)
+	dbWrapper := database.NewDB(db)
+	user, err := dbWrapper.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
 }

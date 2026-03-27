@@ -81,6 +81,8 @@ func Migrate(db *sql.DB) error {
 		// Activity logs index
 		`CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at)`,
+		// Composite index for efficient activity queries (filter by user, order by created_at)
+		`CREATE INDEX IF NOT EXISTS idx_activity_logs_user_created ON activity_logs(user_id, created_at DESC)`,
 
 		// Updated_at trigger for users
 		`CREATE OR REPLACE FUNCTION update_updated_at_column()

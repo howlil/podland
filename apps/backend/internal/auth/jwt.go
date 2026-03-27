@@ -41,22 +41,22 @@ func GenerateAccessToken(userID, email string) (string, error) {
 }
 
 // GenerateRefreshToken generates an opaque refresh token and JTI
-func GenerateRefreshToken() (string, string) {
+func GenerateRefreshToken() (string, string, error) {
 	// Generate random opaque token (32 bytes = 256 bits)
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
-		panic(err)
+		return "", "", err
 	}
 	refreshToken := base64.URLEncoding.EncodeToString(bytes)
 
 	// Generate JTI (16 bytes = 128 bits)
 	jtiBytes := make([]byte, 16)
 	if _, err := rand.Read(jtiBytes); err != nil {
-		panic(err)
+		return "", "", err
 	}
 	jti := hex.EncodeToString(jtiBytes)
 
-	return refreshToken, jti
+	return refreshToken, jti, nil
 }
 
 // HashToken hashes a token using SHA-256

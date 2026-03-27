@@ -54,7 +54,10 @@ func CreateSession(db database.DB, userID string, deviceInfo DeviceInfo) (*Sessi
 	}
 
 	// Generate tokens
-	refreshToken, jti := GenerateRefreshToken()
+	refreshToken, jti, err := GenerateRefreshToken()
+	if err != nil {
+		return nil, err
+	}
 
 	session := &Session{
 		ID:           uuid.New().String(),
@@ -67,7 +70,11 @@ func CreateSession(db database.DB, userID string, deviceInfo DeviceInfo) (*Sessi
 	}
 
 	// Store in database - convert DeviceInfo to JSON
-	deviceInfoJSON, _ := json.Marshal(deviceInfo)
+	deviceInfoJSON, err := json.Marshal(deviceInfo)
+	if err != nil {
+		return nil, err
+	}
+
 	err = db.CreateSession(database.Session{
 		ID:               session.ID,
 		UserID:           session.UserID,
@@ -85,11 +92,11 @@ func CreateSession(db database.DB, userID string, deviceInfo DeviceInfo) (*Sessi
 	return session, nil
 }
 
-// RotateRefreshToken rotates a refresh token (revoke old, create new)
+// RotateRefreshToken rotates a refresh token (revoke old, create new) using atomic transaction
 func RotateRefreshToken(db database.DB, oldToken string) (*Session, error) {
 	oldHash := HashToken(oldToken)
 
-	// Find and validate old token
+	// Find and validate old token first (for error messages)
 	oldSession, err := db.GetSessionByRefreshToken(oldHash)
 	if err != nil {
 		return nil, ErrSessionNotFound
@@ -105,26 +112,31 @@ func RotateRefreshToken(db database.DB, oldToken string) (*Session, error) {
 		return nil, ErrTokenReuse
 	}
 
-	// Revoke old token
-	err = db.RevokeSession(oldSession.ID, time.Now())
+	// Use atomic transaction-based rotation
+	dbSession, err := db.RotateSession(oldHash, oldSession.UserID, oldSession.DeviceInfo)
 	if err != nil {
 		return nil, err
+	}
+
+	// Convert database.Session to auth.Session
+	session := &Session{
+		ID:           dbSession.ID,
+		UserID:       dbSession.UserID,
+		RefreshToken: dbSession.RefreshTokenHash, // Raw token returned for cookie
+		JTI:          dbSession.JTI,
+		CreatedAt:    dbSession.CreatedAt,
+		ExpiresAt:    dbSession.ExpiresAt,
 	}
 
 	// Parse device info from JSON
-	var deviceInfo DeviceInfo
-	_ = json.Unmarshal(oldSession.DeviceInfo, &deviceInfo)
-
-	// Create new session
-	newSession, err := CreateSession(db, oldSession.UserID, deviceInfo)
-	if err != nil {
-		return nil, err
+	if len(dbSession.DeviceInfo) > 0 {
+		var deviceInfo DeviceInfo
+		if err := json.Unmarshal(dbSession.DeviceInfo, &deviceInfo); err == nil {
+			session.DeviceInfo = deviceInfo
+		}
 	}
 
-	// Link old to new (for audit trail)
-	_ = db.LinkSessionReplacement(oldSession.ID, newSession.ID)
-
-	return newSession, nil
+	return session, nil
 }
 
 // GenerateXSRFToken generates a CSRF token

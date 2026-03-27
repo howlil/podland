@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -102,9 +104,9 @@ func FindPrimaryEmail(emails []GitHubEmail) string {
 	return ""
 }
 
-// IsValidStudentEmail checks if the email ends with the student domain
+// IsValidStudentEmail checks if the email ends with the student domain (case-insensitive)
 func IsValidStudentEmail(email string) bool {
-	return len(email) >= 20 && email[len(email)-20:] == "@student.unand.ac.id"
+	return strings.HasSuffix(strings.ToLower(email), "@student.unand.ac.id")
 }
 
 // ExtractNIM extracts the NIM from a student email
@@ -131,9 +133,23 @@ func AssignRole(nim string) string {
 	return "external"
 }
 
-// FetchAvatar downloads the avatar from GitHub URL
+// FetchAvatar downloads the avatar from GitHub URL with timeout and size limit
 func FetchAvatar(avatarURL string) ([]byte, error) {
-	resp, err := http.Get(avatarURL)
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	// Create request with context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", avatarURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create avatar request: %w", err)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch avatar: %w", err)
 	}
@@ -143,5 +159,7 @@ func FetchAvatar(avatarURL string) ([]byte, error) {
 		return nil, fmt.Errorf("avatar request returned status %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	// Limit response size to 5MB to prevent memory exhaustion
+	const maxSize = 5 << 20 // 5MB
+	return io.ReadAll(io.LimitReader(resp.Body, maxSize))
 }

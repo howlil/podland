@@ -9,7 +9,16 @@ import (
 
 // HandleGetActivity returns the user's activity log
 func HandleGetActivity(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userIDRaw := r.Context().Value("user_id")
+	if userIDRaw == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	userID, ok := userIDRaw.(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	dbWrapper := database.NewDB(db)
 	activities, err := dbWrapper.GetUserActivity(userID, 50)

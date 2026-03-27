@@ -10,8 +10,17 @@ import (
 
 // HandleGetMe returns the current authenticated user
 func HandleGetMe(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
-	
+	userIDRaw := r.Context().Value("user_id")
+	if userIDRaw == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	userID, ok := userIDRaw.(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	dbWrapper := database.NewDB(db)
 	user, err := dbWrapper.GetUserByID(userID)
 	if err != nil {
@@ -45,7 +54,16 @@ func HandleGetUser(w http.ResponseWriter, r *http.Request) {
 
 // HandleConfirmNIM confirms or updates the user's NIM
 func HandleConfirmNIM(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userIDRaw := r.Context().Value("user_id")
+	if userIDRaw == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	userID, ok := userIDRaw.(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req struct {
 		NIM string `json:"nim"`
@@ -62,7 +80,7 @@ func HandleConfirmNIM(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbWrapper := database.NewDB(db)
-	
+
 	// Update NIM (this also recalculates role based on NIM)
 	if err := dbWrapper.UpdateUserNIM(userID, req.NIM); err != nil {
 		http.Error(w, "Failed to update NIM", http.StatusInternalServerError)

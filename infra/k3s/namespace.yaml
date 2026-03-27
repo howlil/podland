@@ -5,11 +5,6 @@ metadata:
   labels:
     name: podland
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: podland
-type: Opaque
-stringData:
-  password: "podland_password_change_me_in_production"
+# Note: PostgreSQL secrets are now managed via SealedSecret
+# See: secrets/postgres-sealedsecret.yaml
+# Apply with: kubeseal --format yaml < secret.yaml > secrets/postgres-sealedsecret.yaml

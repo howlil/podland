@@ -1,17 +1,7 @@
 # Podland Backend Deployment for k3s
+# Note: Secrets are now managed via SealedSecret
+# See: secrets/backend-sealedsecret.yaml and secrets/postgres-sealedsecret.yaml
 
-apiVersion: v1
-kind: Secret
-metadata:
-  name: podland-backend-secret
-  namespace: podland
-type: Opaque
-stringData:
-  jwt-secret: "change-this-to-a-secure-random-string-min-32-chars"
-  refresh-token-secret: "change-this-to-another-secure-random-string-min-32-chars"
-  github-client-id: "your-client-id"
-  github-client-secret: "your-client-secret"
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

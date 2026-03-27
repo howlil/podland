@@ -74,10 +74,20 @@ func CSRFMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Validate XSRF-TOKEN header
+		// Skip CSRF for auth endpoints (they have their own state parameter protection)
+		if strings.HasPrefix(r.URL.Path, "/api/auth/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Validate XSRF-TOKEN header against cookie
 		xsrfHeader := r.Header.Get("X-XSRF-TOKEN")
 		xsrfCookie, err := r.Cookie("XSRF-TOKEN")
-		if err != nil || xsrfHeader != xsrfCookie.Value {
+		if err != nil || xsrfCookie.Value == "" {
+			http.Error(w, "Missing CSRF token", http.StatusForbidden)
+			return
+		}
+		if xsrfHeader == "" || xsrfHeader != xsrfCookie.Value {
 			http.Error(w, "Invalid CSRF token", http.StatusForbidden)
 			return
 		}
@@ -93,6 +103,12 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			http.Error(w, "Missing authorization header", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate Bearer prefix
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
 			return
 		}
 
