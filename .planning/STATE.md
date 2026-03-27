@@ -96,6 +96,7 @@ None — Implementation complete, bugs fixed, ready for testing.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260327-trc | Analyze codebase for current errors - no errors found, committed uncommitted files | 2026-03-27 | b1db698 | [260327-trc-analyze-codebase-for-current-errors](./quick/260327-trc-analyze-codebase-for-current-errors/) |
 | 260327-aqg | Fix k3s secrets setup and clarify Docker Compose structure - added working secrets, frontend deployment, restructured compose files | 2026-03-27 | pending | [260327-aqg-fix-k3s-secrets-setup-and-clarify-docker](./quick/260327-aqg-fix-k3s-secrets-setup-and-clarify-docker/) |
 | 260326-001 | Debug Docker database test run - fix Go version, DB password, missing root route | 2026-03-26 | 3a07d75 | [260326-001-docker-db-debug](./quick/260326-001-docker-db-debug/) |
 
