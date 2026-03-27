@@ -1,17 +1,3 @@
-# ⚠️ DEPRECATED - This file is deprecated!
-# Use infra/docker-compose/docker-compose.yml instead
-# This file is kept for backward compatibility only
-# 
-# The old structure was confusing:
-# - Folder named "database/" but also contained backend service
-# - Frontend was missing
-# - New structure: infra/docker-compose/ contains all services
-#
-# Migration:
-# 1. Copy your .env values to infra/docker-compose/.env
-# 2. Run: cd infra/docker-compose && docker-compose up -d
-# 3. Delete this file when ready
-
 version: "3.8"
 
 services:
@@ -61,6 +47,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  frontend:
+    build:
+      context: ../../apps/frontend
+      dockerfile: Dockerfile
+    container_name: podland-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

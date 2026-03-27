@@ -1,0 +1,73 @@
+# Podland Frontend Deployment for k3s
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podland-frontend
+  namespace: podland
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: podland-frontend
+  template:
+    metadata:
+      labels:
+        app: podland-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: podland/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: VITE_API_URL
+              value: "http://podland-backend:8080"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: podland-frontend
+  namespace: podland
+spec:
+  selector:
+    app: podland-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: frontend-build-pvc
+  namespace: podland
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  storageClassName: local-path

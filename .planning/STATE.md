@@ -51,6 +51,7 @@ See: .planning/PROJECT.md (updated 2026-03-25 after initial questioning)
 
 | Date | Event |
 |------|-------|
+| 2026-03-27 | Quick task 260327-aqg: Fix k3s secrets setup and clarify Docker Compose structure - added working secrets, frontend deployment, restructured compose files |
 | 2026-03-26 | Quick task 260326-001: Debug Docker database test run - fixed Go version, DB password, missing root route |
 | 2026-03-25 | Project initialized via /ez:new-project |
 | 2026-03-25 | Research completed (stack, features, architecture, pitfalls) |
@@ -91,6 +92,7 @@ None — Implementation complete, bugs fixed, ready for testing.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260327-aqg | Fix k3s secrets setup and clarify Docker Compose structure - added working secrets, frontend deployment, restructured compose files | 2026-03-27 | pending | [260327-aqg-fix-k3s-secrets-setup-and-clarify-docker](./quick/260327-aqg-fix-k3s-secrets-setup-and-clarify-docker/) |
 | 260326-001 | Debug Docker database test run - fix Go version, DB password, missing root route | 2026-03-26 | 3a07d75 | [260326-001-docker-db-debug](./quick/260326-001-docker-db-debug/) |
 
 ---
@@ -104,4 +106,4 @@ None — Implementation complete, bugs fixed, ready for testing.
 ---
 
 *State initialized: 2026-03-25*
-*Last updated: 2026-03-26 - Completed quick task 260326-001: Debug Docker database test run*
+*Last updated: 2026-03-27 - Completed quick task 260327-aqg: Fix k3s secrets setup and clarify Docker Compose structure*
