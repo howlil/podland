@@ -51,11 +51,13 @@ See: .planning/PROJECT.md (updated 2026-03-25 after initial questioning)
 
 | Date | Event |
 |------|-------|
-| 2026-03-27 | **🎉 Phase 2: Core VM — COMPLETE** (16/16 success criteria met) |
-| 2026-03-27 | **Phase 2 Week 4** - Load testing script + Documentation + STATE update |
-| 2026-03-27 | **Phase 2 Week 3** - Traefik config + GitHub Actions + Integration tests |
-| 2026-03-27 | **Phase 2 Week 2** - VM API + Frontend UI (list, detail, create wizard) |
-| 2026-03-27 | **Phase 2 Week 1** - Database + k8s module + SSH keygen + Quota enforcement |
+| 2026-03-27 | **🎉 Phase 3 Week 1 COMPLETE** - Clean Architecture refactor (4 days, 5 commits) |
+| 2026-03-27 | **Phase 3 Week 1 Day 5** - Unit tests (13 tests passing) + Integration test + Documentation |
+| 2026-03-27 | **Phase 3 Week 1 Day 4** - Dependency Injection (cmd/main.go update) |
+| 2026-03-27 | **Phase 3 Week 1 Day 3** - Thin Handler refactoring (< 100 lines) |
+| 2026-03-27 | **Phase 3 Week 1 Day 2** - Usecase layer (VM + Quota business logic) |
+| 2026-03-27 | **Phase 3 Week 1 Day 1** - Entity + Repository + pkg layers |
+| 2026-03-27 | **Phase 2: Core VM — COMPLETE** (16/16 success criteria met) |
 | 2026-03-27 | Phase 2 planning completed - 12 decisions locked, research done, implementation plan created |
 | 2026-03-25 | Project initialized via /ez:new-project |
 | 2026-03-25 | Research completed (stack, features, architecture, pitfalls) |
