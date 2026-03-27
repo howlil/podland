@@ -20,12 +20,12 @@ See: .planning/PROJECT.md (updated 2026-03-25 after initial questioning)
 | Phase | Status | Plans | Progress | Started | Completed |
 |-------|--------|-------|----------|---------|-----------|
 | 1: Foundation | ✅ Complete | 1/1 | 100% | 2026-03-25 | 2026-03-25 |
-| 2: Core VM | ○ Pending | 0/0 | 0% | — | — |
+| 2: Core VM | 📋 Planned | 1/0 | 0% | 2026-03-27 | — |
 | 3: Networking | ○ Pending | 0/0 | 0% | — | — |
 | 4: Observability | ○ Pending | 0/0 | 0% | — | — |
 | 5: Admin + Polish | ○ Pending | 0/0 | 0% | — | — |
 
-**Overall:** 1/5 phases complete (20%)
+**Overall:** 1/5 phases complete (20%), 1/5 planned (40%)
 
 ---
 
@@ -51,6 +51,7 @@ See: .planning/PROJECT.md (updated 2026-03-25 after initial questioning)
 
 | Date | Event |
 |------|-------|
+| 2026-03-27 | Phase 2 planning completed - 12 decisions locked, research done, implementation plan created |
 | 2026-03-27 | Quick task 260327-aqg: Fix k3s secrets setup and clarify Docker Compose structure - added working secrets, frontend deployment, restructured compose files |
 | 2026-03-26 | Quick task 260326-001: Debug Docker database test run - fixed Go version, DB password, missing root route |
 | 2026-03-25 | Project initialized via /ez:new-project |
