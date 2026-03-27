@@ -8,6 +8,16 @@ import (
 	pkgerrors "github.com/podland/backend/pkg/errors"
 )
 
+// Exported errors for handler use
+var (
+	ErrVMNotFound       = pkgerrors.ErrVMNotFound
+	ErrQuotaExceeded    = pkgerrors.ErrQuotaExceeded
+	ErrInvalidRequest   = pkgerrors.ErrInvalidRequest
+	ErrTierNotAvailable = pkgerrors.ErrTierNotAvailable
+	ErrVMNotStopped     = pkgerrors.ErrVMNotStopped
+	ErrVMNotRunning     = pkgerrors.ErrVMNotRunning
+)
+
 // VMUsecase defines VM business logic
 type VMUsecase struct {
 	vmRepo    repository.VMRepository
@@ -26,9 +36,10 @@ func NewVMUsecase(vmRepo repository.VMRepository, quotaRepo repository.QuotaRepo
 
 // CreateVMInput represents the input for creating a VM
 type CreateVMInput struct {
-	Name string
-	OS   string
-	Tier string
+	Name         string
+	OS           string
+	Tier         string
+	SSHPublicKey string
 }
 
 // CreateVM is the business logic for creating a VM
@@ -65,13 +76,14 @@ func (uc *VMUsecase) CreateVM(ctx context.Context, userID string, input CreateVM
 
 	// 6. Create VM in database
 	vm, err := uc.vmRepo.CreateVM(ctx, repository.VMCreateInput{
-		UserID:  userID,
-		Name:    input.Name,
-		OS:      input.OS,
-		Tier:    input.Tier,
-		CPU:     tier.CPU,
-		RAM:     tier.RAM,
-		Storage: tier.Storage,
+		UserID:       userID,
+		Name:         input.Name,
+		OS:           input.OS,
+		Tier:         input.Tier,
+		CPU:          tier.CPU,
+		RAM:          tier.RAM,
+		Storage:      tier.Storage,
+		SSHPublicKey: input.SSHPublicKey,
 	})
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to create VM")

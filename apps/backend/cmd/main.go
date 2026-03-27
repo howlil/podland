@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,13 +12,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/podland/backend/handler"
+	authmw "github.com/podland/backend/handler/middleware"
 	"github.com/podland/backend/internal/config"
 	"github.com/podland/backend/internal/database"
-	"github.com/podland/backend/handlers"
-	"github.com/podland/backend/middleware"
+	"github.com/podland/backend/internal/repository"
+	"github.com/podland/backend/internal/usecase"
+	appmiddleware "github.com/podland/backend/middleware"
+	handlers "github.com/podland/backend/handlers"
 )
-
-var db *sql.DB
 
 func main() {
 	// Load environment variables
@@ -28,8 +29,7 @@ func main() {
 	}
 
 	// Initialize database
-	var err error
-	db, err = database.Init()
+	db, err := database.Init()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
@@ -41,12 +41,21 @@ func main() {
 	}
 
 	// Initialize middleware DB
-	if err := middleware.InitDB(); err != nil {
+	if err := appmiddleware.InitDB(); err != nil {
 		log.Fatalf("Failed to init middleware DB: %v", err)
 	}
 
-	// Set db for handlers
-	handlers.SetDB(db)
+	// Create repositories (dependency injection)
+	vmRepo := repository.NewVMRepository(db)
+	quotaRepo := repository.NewQuotaRepository(db)
+	userRepo := repository.NewUserRepository(db)
+
+	// Create usecases (dependency injection)
+	vmUsecase := usecase.NewVMUsecase(vmRepo, quotaRepo, userRepo)
+
+	// Create handlers (dependency injection)
+	vmHandler := handler.NewVMHandler(vmUsecase)
+	_ = authmw.NewAuthHelper()
 
 	// Create chi router
 	r := chi.NewRouter()
@@ -72,7 +81,7 @@ func main() {
 	r.Route("/api/users", func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				appmiddleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 					next.ServeHTTP(w, r)
 				})(w, r)
 			})
@@ -86,7 +95,7 @@ func main() {
 	r.Route("/api/activity", func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				appmiddleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 					next.ServeHTTP(w, r)
 				})(w, r)
 			})
@@ -98,18 +107,18 @@ func main() {
 	r.Route("/api/vms", func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+				appmiddleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 					next.ServeHTTP(w, r)
 				})(w, r)
 			})
 		})
-		r.Post("/", handlers.HandleCreateVM)
-		r.Get("/", handlers.HandleListVMs)
-		r.Get("/{id}", handlers.HandleGetVM)
-		r.Post("/{id}/start", handlers.HandleStartVM)
-		r.Post("/{id}/stop", handlers.HandleStopVM)
-		r.Post("/{id}/restart", handlers.HandleRestartVM)
-		r.Delete("/{id}", handlers.HandleDeleteVM)
+		r.Post("/", vmHandler.HandleCreateVM)
+		r.Get("/", vmHandler.HandleListVMs)
+		r.Get("/{id}", vmHandler.HandleGetVM)
+		r.Post("/{id}/start", vmHandler.HandleStartVM)
+		r.Post("/{id}/stop", vmHandler.HandleStopVM)
+		r.Post("/{id}/restart", vmHandler.HandleRestartVM)
+		r.Delete("/{id}", vmHandler.HandleDeleteVM)
 	})
 
 	// Health check
@@ -119,7 +128,7 @@ func main() {
 	addr := fmt.Sprintf(":%s", os.Getenv("PORT"))
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      middleware.CSRFMiddleware(middleware.CORSMiddleware(r)),
+		Handler:      appmiddleware.CSRFMiddleware(appmiddleware.CORSMiddleware(r)),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
