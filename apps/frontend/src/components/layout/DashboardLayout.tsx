@@ -1,4 +1,3 @@
-import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { useState } from "react";
 
@@ -17,20 +16,27 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           <nav className="flex-1 px-2 space-y-1">
-            <Link
-              to="/dashboard"
+            <a
+              href="/dashboard"
               className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700"
             >
               <span className="mr-3">📊</span>
               Dashboard
-            </Link>
-            <Link
-              to="/dashboard/profile"
+            </a>
+            <a
+              href="/dashboard/-vms"
+              className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <span className="mr-3">💻</span>
+              VMs
+            </a>
+            <a
+              href="/dashboard/profile"
               className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <span className="mr-3">👤</span>
               Profile
-            </Link>
+            </a>
           </nav>
 
           {/* User Avatar Dropdown */}
@@ -42,21 +48,28 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Mobile Bottom Tab Bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-50">
-        <div className="grid grid-cols-2 h-16">
-          <Link
-            to="/dashboard"
+        <div className="grid grid-cols-3 h-16">
+          <a
+            href="/dashboard"
             className="flex flex-col items-center justify-center text-gray-900 dark:text-white"
           >
             <span className="text-xl">📊</span>
             <span className="text-xs mt-1">Dashboard</span>
-          </Link>
-          <Link
-            to="/dashboard/profile"
+          </a>
+          <a
+            href="/dashboard/-vms"
+            className="flex flex-col items-center justify-center text-gray-700 dark:text-gray-300"
+          >
+            <span className="text-xl">💻</span>
+            <span className="text-xs mt-1">VMs</span>
+          </a>
+          <a
+            href="/dashboard/profile"
             className="flex flex-col items-center justify-center text-gray-700 dark:text-gray-300"
           >
             <span className="text-xl">👤</span>
             <span className="text-xs mt-1">Profile</span>
-          </Link>
+          </a>
         </div>
       </nav>
 

@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/podland/backend/internal/config"
 	"github.com/podland/backend/internal/database"
 	"github.com/podland/backend/handlers"
@@ -46,35 +48,78 @@ func main() {
 	// Set db for handlers
 	handlers.SetDB(db)
 
-	// Create router
-	mux := http.NewServeMux()
+	// Create chi router
+	r := chi.NewRouter()
+
+	// Middleware
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.RealIP)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
 
 	// Static files (avatars)
 	fs := http.FileServer(http.Dir("./uploads"))
-	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fs))
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", fs))
 
 	// Auth routes
-	mux.HandleFunc("GET /api/auth/login", handlers.HandleLogin)
-	mux.HandleFunc("GET /api/auth/github/callback", handlers.HandleCallback)
-	mux.HandleFunc("POST /api/auth/refresh", handlers.HandleRefresh)
-	mux.HandleFunc("POST /api/auth/logout", handlers.HandleLogout)
+	r.Get("/api/auth/login", handlers.HandleLogin)
+	r.Get("/api/auth/github/callback", handlers.HandleCallback)
+	r.Post("/api/auth/refresh", handlers.HandleRefresh)
+	r.Post("/api/auth/logout", handlers.HandleLogout)
+	r.Get("/api/auth/welcome/user", handlers.HandleGetWelcomeUser)
 
 	// User routes (protected)
-	mux.Handle("GET /api/users/me", middleware.AuthMiddleware(http.HandlerFunc(handlers.HandleGetMe)))
-	mux.Handle("GET /api/users/{id}", middleware.AuthMiddleware(http.HandlerFunc(handlers.HandleGetUser)))
-	mux.Handle("POST /api/users/confirm-nim", middleware.AuthMiddleware(http.HandlerFunc(handlers.HandleConfirmNIM)))
+	r.Route("/api/users", func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					next.ServeHTTP(w, r)
+				})(w, r)
+			})
+		})
+		r.Get("/me", handlers.HandleGetMe)
+		r.Get("/{id}", handlers.HandleGetUser)
+		r.Post("/confirm-nim", handlers.HandleConfirmNIM)
+	})
 
 	// Activity routes (protected)
-	mux.Handle("GET /api/activity", middleware.AuthMiddleware(http.HandlerFunc(handlers.HandleGetActivity)))
+	r.Route("/api/activity", func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					next.ServeHTTP(w, r)
+				})(w, r)
+			})
+		})
+		r.Get("/", handlers.HandleGetActivity)
+	})
+
+	// VM routes (protected)
+	r.Route("/api/vms", func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+					next.ServeHTTP(w, r)
+				})(w, r)
+			})
+		})
+		r.Post("/", handlers.HandleCreateVM)
+		r.Get("/", handlers.HandleListVMs)
+		r.Get("/{id}", handlers.HandleGetVM)
+		r.Post("/{id}/start", handlers.HandleStartVM)
+		r.Post("/{id}/stop", handlers.HandleStopVM)
+		r.Post("/{id}/restart", handlers.HandleRestartVM)
+		r.Delete("/{id}", handlers.HandleDeleteVM)
+	})
 
 	// Health check
-	mux.HandleFunc("GET /api/health", handlers.HandleHealth)
+	r.Get("/api/health", handlers.HandleHealth)
 
 	// Create server
 	addr := fmt.Sprintf(":%s", os.Getenv("PORT"))
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      middleware.CSRFMiddleware(middleware.CORSMiddleware(mux)),
+		Handler:      middleware.CSRFMiddleware(middleware.CORSMiddleware(r)),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,

@@ -23,9 +23,14 @@ interface AuthState {
   setUser: (user: User | null) => void;
 }
 
-let refreshTimer: NodeJS.Timeout | null = null;
+interface AuthStore extends AuthState {
+  setRefreshTimer: (timer: ReturnType<typeof setTimeout> | null) => void;
+  clearRefreshTimer: () => void;
+}
 
-export const useAuth = create<AuthState>((set, get) => ({
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const useAuth = create<AuthStore>((set, get) => ({
   user: null,
   isLoading: true,
   isAuthenticated: false,
@@ -40,6 +45,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error("Logout error:", error);
     }
+    get().clearRefreshTimer();
     set({ user: null, isAuthenticated: false, isLoading: false });
     window.location.href = "/";
   },
@@ -50,8 +56,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ user: data, isAuthenticated: true, isLoading: false });
 
       // Schedule silent refresh at 50% expiry (7.5 minutes for 15-min token)
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => {
+      get().clearRefreshTimer();
+      const timer = setTimeout(() => {
         api
           .post("/auth/refresh")
           .then(({ data }) => {
@@ -63,6 +69,8 @@ export const useAuth = create<AuthState>((set, get) => ({
             get().logout();
           });
       }, 7.5 * 60 * 1000);
+
+      get().setRefreshTimer(timer);
     } catch (error) {
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
@@ -71,10 +79,23 @@ export const useAuth = create<AuthState>((set, get) => ({
   setUser: (user) => {
     set({ user, isAuthenticated: !!user, isLoading: false });
   },
+
+  setRefreshTimer: (timer) => {
+    refreshTimer = timer;
+  },
+
+  clearRefreshTimer: () => {
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+  },
 }));
 
 // Initialize auth on mount
 export function initAuth() {
-  const { refreshUser } = useAuth.getState();
+  const { refreshUser, clearRefreshTimer } = useAuth.getState();
   refreshUser();
+  // Clean up timer on page unload
+  window.addEventListener("beforeunload", clearRefreshTimer);
 }

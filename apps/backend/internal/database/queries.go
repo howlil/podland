@@ -1,9 +1,15 @@
 package database
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/sha3"
 )
 
 // CreateUser creates a new user
@@ -155,9 +161,12 @@ func (d *sqlDB) CreateSession(session Session) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
-	deviceInfoJSON, _ := json.Marshal(session.DeviceInfo)
+	deviceInfoJSON, err := json.Marshal(session.DeviceInfo)
+	if err != nil {
+		return err
+	}
 
-	_, err := d.db.Exec(query,
+	_, err = d.db.Exec(query,
 		session.ID,
 		session.UserID,
 		session.RefreshTokenHash,
@@ -310,6 +319,76 @@ func (d *sqlDB) LinkSessionReplacement(oldID, newID string) error {
 	return err
 }
 
+// RotateSession atomically rotates a session token (revoke old, create new)
+func (d *sqlDB) RotateSession(oldTokenHash string, userID string, deviceInfo json.RawMessage) (*Session, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// Find the old session
+	var oldID string
+	query := `SELECT id FROM sessions WHERE refresh_token_hash = $1`
+	if err := tx.QueryRow(query, oldTokenHash).Scan(&oldID); err != nil {
+		return nil, err
+	}
+
+	// Revoke old session
+	query = `UPDATE sessions SET revoked_at = NOW() WHERE id = $1`
+	if _, err := tx.Exec(query, oldID); err != nil {
+		return nil, err
+	}
+
+	// Generate new refresh token and JTI
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return nil, err
+	}
+	newRefreshToken := base64.URLEncoding.EncodeToString(bytes)
+
+	jtiBytes := make([]byte, 16)
+	if _, err := rand.Read(jtiBytes); err != nil {
+		return nil, err
+	}
+	newJTI := hex.EncodeToString(jtiBytes)
+
+	// Hash the refresh token for storage
+	hash := sha3.Sum256([]byte(newRefreshToken))
+	newRefreshTokenHash := hex.EncodeToString(hash[:])
+
+	newSessionID := uuid.New().String()
+
+	query = `
+		INSERT INTO sessions (id, user_id, refresh_token_hash, jti, device_info, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW() + INTERVAL '7 days')
+	`
+	if _, err := tx.Exec(query, newSessionID, userID, newRefreshTokenHash, newJTI, deviceInfo); err != nil {
+		return nil, err
+	}
+
+	// Link old to new
+	query = `UPDATE sessions SET replaced_by = $2 WHERE id = $1`
+	if _, err := tx.Exec(query, oldID, newSessionID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Return session with raw token for cookie
+	return &Session{
+		ID:               newSessionID,
+		UserID:           userID,
+		RefreshTokenHash: newRefreshToken, // Return raw token
+		JTI:              newJTI,
+		DeviceInfo:       deviceInfo,
+		CreatedAt:        time.Now(),
+		ExpiresAt:        time.Now().Add(7 * 24 * time.Hour),
+	}, nil
+}
+
 // CreateActivityLog creates an activity log entry
 func (d *sqlDB) CreateActivityLog(userID string, action string, metadata map[string]interface{}) error {
 	query := `
@@ -401,4 +480,265 @@ func NewUserCreateInput(githubID, email, displayName, avatarURL, nim, role strin
 		NIM:         nim,
 		Role:        role,
 	}
+}
+
+// CreateVM creates a new VM
+func (d *sqlDB) CreateVM(input VMCreateInput) (*VM, error) {
+	query := `
+		INSERT INTO vms (user_id, name, os, tier, cpu, ram, storage, status, ssh_public_key, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, NOW(), NOW())
+		RETURNING id, user_id, name, os, tier, cpu, ram, storage, status, k8s_namespace, k8s_deployment, k8s_service, k8s_pvc, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+	`
+
+	vm := &VM{}
+	err := d.db.QueryRow(query,
+		input.UserID,
+		input.Name,
+		input.OS,
+		input.Tier,
+		input.CPU,
+		input.RAM,
+		input.Storage,
+		input.SSHPublicKey,
+	).Scan(
+		&vm.ID,
+		&vm.UserID,
+		&vm.Name,
+		&vm.OS,
+		&vm.Tier,
+		&vm.CPU,
+		&vm.RAM,
+		&vm.Storage,
+		&vm.Status,
+		&vm.K8sNamespace,
+		&vm.K8sDeployment,
+		&vm.K8sService,
+		&vm.K8sPVC,
+		&vm.Domain,
+		&vm.SSHPublicKey,
+		&vm.CreatedAt,
+		&vm.UpdatedAt,
+		&vm.StartedAt,
+		&vm.StoppedAt,
+		&vm.DeletedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return vm, nil
+}
+
+// GetVMByID gets a VM by ID
+func (d *sqlDB) GetVMByID(id string) (*VM, error) {
+	query := `
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, k8s_namespace, k8s_deployment, k8s_service, k8s_pvc, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		FROM vms
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	vm := &VM{}
+	err := d.db.QueryRow(query, id).Scan(
+		&vm.ID,
+		&vm.UserID,
+		&vm.Name,
+		&vm.OS,
+		&vm.Tier,
+		&vm.CPU,
+		&vm.RAM,
+		&vm.Storage,
+		&vm.Status,
+		&vm.K8sNamespace,
+		&vm.K8sDeployment,
+		&vm.K8sService,
+		&vm.K8sPVC,
+		&vm.Domain,
+		&vm.SSHPublicKey,
+		&vm.CreatedAt,
+		&vm.UpdatedAt,
+		&vm.StartedAt,
+		&vm.StoppedAt,
+		&vm.DeletedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, sql.ErrNoRows
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return vm, nil
+}
+
+// GetVMByIDAndUser gets a VM by ID and user ID (ownership check)
+func (d *sqlDB) GetVMByIDAndUser(id, userID string) (*VM, error) {
+	query := `
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, k8s_namespace, k8s_deployment, k8s_service, k8s_pvc, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		FROM vms
+		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+	`
+
+	vm := &VM{}
+	err := d.db.QueryRow(query, id, userID).Scan(
+		&vm.ID,
+		&vm.UserID,
+		&vm.Name,
+		&vm.OS,
+		&vm.Tier,
+		&vm.CPU,
+		&vm.RAM,
+		&vm.Storage,
+		&vm.Status,
+		&vm.K8sNamespace,
+		&vm.K8sDeployment,
+		&vm.K8sService,
+		&vm.K8sPVC,
+		&vm.Domain,
+		&vm.SSHPublicKey,
+		&vm.CreatedAt,
+		&vm.UpdatedAt,
+		&vm.StartedAt,
+		&vm.StoppedAt,
+		&vm.DeletedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, sql.ErrNoRows
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return vm, nil
+}
+
+// GetUserVMs gets all VMs for a user
+func (d *sqlDB) GetUserVMs(userID string) ([]*VM, error) {
+	query := `
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, k8s_namespace, k8s_deployment, k8s_service, k8s_pvc, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		FROM vms
+		WHERE user_id = $1 AND deleted_at IS NULL
+		ORDER BY created_at DESC
+	`
+
+	rows, err := d.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var vms []*VM
+	for rows.Next() {
+		vm := &VM{}
+		err := rows.Scan(
+			&vm.ID,
+			&vm.UserID,
+			&vm.Name,
+			&vm.OS,
+			&vm.Tier,
+			&vm.CPU,
+			&vm.RAM,
+			&vm.Storage,
+			&vm.Status,
+			&vm.K8sNamespace,
+			&vm.K8sDeployment,
+			&vm.K8sService,
+			&vm.K8sPVC,
+			&vm.Domain,
+			&vm.SSHPublicKey,
+			&vm.CreatedAt,
+			&vm.UpdatedAt,
+			&vm.StartedAt,
+			&vm.StoppedAt,
+			&vm.DeletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		vms = append(vms, vm)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return vms, nil
+}
+
+// UpdateVM updates a VM
+func (d *sqlDB) UpdateVM(id string, input VMUpdateInput) error {
+	query := `
+		UPDATE vms
+		SET
+			status = COALESCE($1, status),
+			k8s_namespace = COALESCE($2, k8s_namespace),
+			k8s_deployment = COALESCE($3, k8s_deployment),
+			k8s_service = COALESCE($4, k8s_service),
+			k8s_pvc = COALESCE($5, k8s_pvc),
+			domain = COALESCE($6, domain),
+			started_at = COALESCE($7, started_at),
+			stopped_at = COALESCE($8, stopped_at),
+			updated_at = NOW()
+		WHERE id = $9
+	`
+
+	_, err := d.db.Exec(query,
+		input.Status,
+		input.K8sNamespace,
+		input.K8sDeployment,
+		input.K8sService,
+		input.K8sPVC,
+		input.Domain,
+		input.StartedAt,
+		input.StoppedAt,
+		id,
+	)
+
+	return err
+}
+
+// UpdateVMStatus updates the status of a VM
+func (d *sqlDB) UpdateVMStatus(id, status string) error {
+	now := time.Now()
+
+	var query string
+	if status == "running" {
+		query = `
+			UPDATE vms
+			SET status = $1, started_at = $2, stopped_at = NULL, updated_at = NOW()
+			WHERE id = $3
+		`
+		_, err := d.db.Exec(query, status, now, id)
+		return err
+	} else if status == "stopped" {
+		query = `
+			UPDATE vms
+			SET status = $1, stopped_at = $2, updated_at = NOW()
+			WHERE id = $3
+		`
+		_, err := d.db.Exec(query, status, now, id)
+		return err
+	} else {
+		query = `
+			UPDATE vms
+			SET status = $1, updated_at = NOW()
+			WHERE id = $2
+		`
+		_, err := d.db.Exec(query, status, id)
+		return err
+	}
+}
+
+// DeleteVM soft-deletes a VM
+func (d *sqlDB) DeleteVM(id string) error {
+	query := `
+		UPDATE vms
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1
+	`
+
+	_, err := d.db.Exec(query, id)
+	return err
 }

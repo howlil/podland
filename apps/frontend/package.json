@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vinxi dev",
-    "build": "vinxi build",
-    "preview": "vinxi preview",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx",
-    "clean": "rimraf .output node_modules"
+    "clean": "rimraf .output node_modules dist"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.77.2",
@@ -20,11 +20,14 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
-    "@tanstack/start": "^1.114.34",
+    "@tanstack/router-devtools": "^1.114.34",
+    "@tanstack/router-plugin": "^1.114.34",
+    "@types/node": "^25.5.0",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vite": "^5.1.0"
   }
 }
