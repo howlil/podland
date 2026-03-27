@@ -1,0 +1,231 @@
+# Traefik Configuration for k3s
+# Configures entryPoints for web (80), websecure (443), ssh (22), game (25565)
+# Enables IngressRouteTCP for SSH routing and wildcard subdomain routing
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+  labels:
+    app: traefik
+    app.kubernetes.io/name: traefik
+spec:
+  valuesContent: |
+    # Traefik Helm Chart Values for Podland
+    # https://doc.traefik.io/traefik/routing/providers/kubernetes-crd/
+
+    # Port configuration
+    ports:
+      web:
+        exposedPort: 80
+        protocol: HTTP
+        redirectTo:
+          port: websecure
+          priority: 10
+      websecure:
+        exposedPort: 443
+        protocol: HTTPS
+        tls:
+          enabled: true
+      ssh:
+        exposedPort: 22
+        protocol: TCP
+      game:
+        exposedPort: 25565
+        protocol: TCP
+
+    # Enable Kubernetes CRD providers
+    providers:
+      kubernetesCRD:
+        enabled: true
+        allowCrossNamespace: true
+        allowExternalNameServices: true
+      kubernetesIngress:
+        enabled: true
+        allowExternalNameServices: true
+
+    # Logs configuration
+    logs:
+      general:
+        level: INFO
+      access:
+        enabled: true
+
+    # API dashboard (disabled in production)
+    api:
+      dashboard: false
+      insecure: false
+
+    # Global arguments
+    globalArguments:
+      - "--global.checknewversion=false"
+      - "--global.sendanonymoususage=false"
+
+    # Additional arguments for TCP routing
+    additionalArguments:
+      - "--serversTransport.insecureSkipVerify=true"
+
+    # Deployment configuration
+    deployment:
+      enabled: true
+      replicas: 1
+      annotations: {}
+      labels: {}
+      podAnnotations: {}
+      podLabels: {}
+      additionalContainers: []
+      initContainers: []
+
+    # Service configuration
+    service:
+      enabled: true
+      type: LoadBalancer
+      annotations: {}
+      labels: {}
+      spec: {}
+      loadBalancerSourceRanges: []
+      externalIPs: []
+
+    # Affinity settings
+    affinity: {}
+
+    # Node selector
+    nodeSelector: {}
+
+    # Tolerations
+    tolerations: []
+
+    # Resources
+    resources: {}
+
+    # Security context
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: [ALL]
+      runAsGroup: 65532
+      runAsNonRoot: true
+      runAsUser: 65532
+
+    # Pod security context
+    podSecurityContext:
+      fsGroup: 65532
+
+---
+# IngressRouteTCP for SSH routing to VMs
+# Routes SSH traffic based on HostSNI to appropriate VM services
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: vm-ssh-ingress
+  namespace: podland
+  labels:
+    app: podland
+    app.kubernetes.io/name: vm-ssh-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik-external
+spec:
+  entryPoints:
+    - ssh
+  routes:
+    # Match SSH connections to *.podland.app subdomains
+    - match: HostSNI(`*.podland.app`)
+      priority: 10
+      services:
+        - name: vm-ssh-router
+          port: 22
+          sticky:
+            cookie:
+              name: vm-ssh-session
+              secure: true
+    # Default fallback for unmatched SSH connections
+    - match: HostSNI(`*`)
+      priority: 1
+      services:
+        - name: vm-ssh-default
+          port: 22
+
+---
+# IngressRouteTCP for game server routing (e.g., Minecraft on port 25565)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: vm-game-ingress
+  namespace: podland
+  labels:
+    app: podland
+    app.kubernetes.io/name: vm-game-ingress
+spec:
+  entryPoints:
+    - game
+  routes:
+    # Match game server connections to *.podland.app subdomains
+    - match: HostSNI(`*.podland.app`)
+      priority: 10
+      services:
+        - name: vm-game-router
+          port: 25565
+
+---
+# Ingress for HTTP/HTTPS wildcard subdomain routing
+# Routes HTTP/HTTPS traffic to VMs based on subdomain
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vm-http-ingress
+  namespace: podland
+  labels:
+    app: podland
+    app.kubernetes.io/name: vm-http-ingress
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: podland-redirect-https@kubernetescrd
+spec:
+  # Wildcard rule for all VM subdomains
+  rules:
+    - host: "*.podland.app"
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: vm-http-router
+                port:
+                  number: 80
+  # TLS configuration for wildcard certificate
+  tls:
+    - hosts:
+        - "*.podland.app"
+        - podland.app
+      secretName: podland-wildcard-tls
+
+---
+# Middleware for HTTP to HTTPS redirect
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: podland
+  labels:
+    app: podland
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+
+---
+# TLSStore for default certificate
+apiVersion: traefik.containo.us/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: podland
+  labels:
+    app: podland
+spec:
+  defaultCertificate:
+    secretName: podland-wildcard-tls
