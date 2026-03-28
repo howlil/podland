@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"log"
 
 	"github.com/podland/backend/internal/entity"
 	"github.com/podland/backend/internal/repository"
@@ -69,8 +70,8 @@ func (uc *VMUsecase) CreateVM(ctx context.Context, userID string, input CreateVM
 		return nil, pkgerrors.ErrTierNotAvailable
 	}
 
-	// 5. Check quota
-	if err := uc.quotaRepo.CheckQuota(ctx, userID, tier.CPU, tier.RAM, tier.Storage); err != nil {
+	// 5. Atomically check and reserve quota
+	if err := uc.quotaRepo.CheckAndReserveQuota(ctx, userID, tier.CPU, tier.RAM, tier.Storage); err != nil {
 		return nil, pkgerrors.ErrQuotaExceeded
 	}
 
@@ -86,12 +87,9 @@ func (uc *VMUsecase) CreateVM(ctx context.Context, userID string, input CreateVM
 		SSHPublicKey: input.SSHPublicKey,
 	})
 	if err != nil {
+		// Release the reserved quota since VM creation failed
+		_ = uc.quotaRepo.UpdateUsage(ctx, userID, -tier.CPU, -tier.RAM, -tier.Storage, -1)
 		return nil, pkgerrors.Wrap(err, "failed to create VM")
-	}
-
-	// 7. Update quota usage
-	if err := uc.quotaRepo.UpdateUsage(ctx, userID, tier.CPU, tier.RAM, tier.Storage, 1); err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to update quota")
 	}
 
 	return vm, nil
@@ -190,8 +188,7 @@ func (uc *VMUsecase) DeleteVM(ctx context.Context, vmID, userID string) error {
 
 	// Update quota usage (decrease)
 	if err := uc.quotaRepo.UpdateUsage(ctx, userID, -vm.CPU, -vm.RAM, -vm.Storage, -1); err != nil {
-		// Log error but continue with delete
-		// In production, use proper logging
+		log.Printf("WARNING: failed to release quota for deleted VM %s (user %s): %v", vmID, userID, err)
 	}
 
 	// Delete VM (soft delete)

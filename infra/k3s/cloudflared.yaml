@@ -1,0 +1,161 @@
+# Cloudflare Tunnel Deployment for Podland
+# Routes all *.podland.app traffic through Cloudflare's edge network to Traefik
+
+# Namespace for cloudflared
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudflared
+  labels:
+    app: cloudflared
+---
+# Secret containing tunnel credentials
+# IMPORTANT: Replace placeholder values with actual tunnel credentials
+# Generate via: cloudflared tunnel create podland-cluster
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflared-credentials
+  namespace: cloudflared
+type: Opaque
+stringData:
+  # Tunnel credentials JSON - replace with actual values from ~/.cloudflared/<TUNNEL_ID>.json
+  tunnel.json: |
+    {
+      "AccountTag": "YOUR_ACCOUNT_TAG",
+      "TunnelID": "YOUR_TUNNEL_ID",
+      "TunnelSecret": "YOUR_TUNNEL_SECRET"
+    }
+---
+# ConfigMap with cloudflared configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: cloudflared
+data:
+  config.yaml: |
+    tunnel: podland-cluster
+    credentials-file: /etc/cloudflared/tunnel/tunnel.json
+
+    # Route all *.podland.app traffic to Traefik ingress
+    ingress:
+    - hostname: "*.podland.app"
+      service: http://traefik.podland.svc.cluster.local:80
+      originRequest:
+        noTLSVerify: true  # Traefik uses self-signed Origin CA
+
+    # Default 404 for non-matching routes
+    - service: http_status:404
+
+    # Logging and metrics
+    loglevel: info
+    metrics: "0.0.0.0:2000"
+---
+# cloudflared Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: cloudflared
+  labels:
+    app: cloudflared
+spec:
+  replicas: 2  # 2 replicas for HA (failover only, not load balancing)
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      # Required for ICMP traffic (ping, traceroute)
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ping_group_range
+            value: "65532 65532"
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:2025.1.0
+        args:
+        - tunnel
+        - --config
+        - /etc/cloudflared/config/config.yaml
+        - run
+        - --no-autoupdate  # Disable auto-update for version control
+        env:
+        - name: TUNNEL_CREDENTIAL_FILE
+          value: /etc/cloudflared/tunnel/tunnel.json
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 2000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 2000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: credentials
+          mountPath: /etc/cloudflared/tunnel
+          readOnly: true
+        - name: config
+          mountPath: /etc/cloudflared/config
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+      volumes:
+      - name: credentials
+        secret:
+          secretName: cloudflared-credentials
+      - name: config
+        configMap:
+          name: cloudflared-config
+---
+# Service for metrics scraping
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudflared-metrics
+  namespace: cloudflared
+  labels:
+    app: cloudflared
+spec:
+  selector:
+    app: cloudflared
+  ports:
+  - name: metrics
+    port: 2000
+    targetPort: 2000
+  type: ClusterIP
+---
+# PodDisruptionBudget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared-pdb
+  namespace: cloudflared
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudflared

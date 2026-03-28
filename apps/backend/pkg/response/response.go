@@ -1,4 +1,5 @@
-package response
+// Package pkgresponse provides HTTP response utilities
+package pkgresponse
 
 import (
 	"encoding/json"

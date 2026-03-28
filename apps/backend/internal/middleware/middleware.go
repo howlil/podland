@@ -2,34 +2,12 @@ package middleware
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/podland/backend/internal/auth"
-	"github.com/podland/backend/internal/database"
 )
-
-var (
-	dbInstance *sql.DB
-	dbOnce     sync.Once
-)
-
-// InitDB initializes the database connection (call once at startup)
-func InitDB() error {
-	var err error
-	dbOnce.Do(func() {
-		dbInstance, err = database.Init()
-	})
-	return err
-}
-
-// getDBConnection returns the database connection
-func getDBConnection() *sql.DB {
-	return dbInstance
-}
 
 // CORSMiddleware adds CORS headers to responses
 func CORSMiddleware(next http.Handler) http.Handler {

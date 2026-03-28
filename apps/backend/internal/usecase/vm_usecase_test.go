@@ -69,11 +69,12 @@ func (m *MockVMRepository) DeleteVM(ctx context.Context, id string) error {
 
 // MockQuotaRepository is a mock implementation of QuotaRepository
 type MockQuotaRepository struct {
-	CheckQuotaFn   func(ctx context.Context, userID string, cpu float64, ram, storage int64) error
-	UpdateUsageFn  func(ctx context.Context, userID string, cpu float64, ram, storage int64, vmCountDelta int) error
-	GetQuotaFn     func(ctx context.Context, userID string) (*entity.Quota, error)
-	GetTierFn      func(ctx context.Context, name string) (*entity.Tier, error)
-	GetAllTiersFn  func(ctx context.Context) ([]*entity.Tier, error)
+	CheckQuotaFn           func(ctx context.Context, userID string, cpu float64, ram, storage int64) error
+	CheckAndReserveQuotaFn func(ctx context.Context, userID string, cpu float64, ram, storage int64) error
+	UpdateUsageFn          func(ctx context.Context, userID string, cpu float64, ram, storage int64, vmCountDelta int) error
+	GetQuotaFn             func(ctx context.Context, userID string) (*entity.Quota, error)
+	GetTierFn              func(ctx context.Context, name string) (*entity.Tier, error)
+	GetAllTiersFn          func(ctx context.Context) ([]*entity.Tier, error)
 }
 
 func (m *MockQuotaRepository) CheckQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
@@ -81,6 +82,13 @@ func (m *MockQuotaRepository) CheckQuota(ctx context.Context, userID string, cpu
 		return m.CheckQuotaFn(ctx, userID, cpu, ram, storage)
 	}
 	return errors.New("CheckQuota not implemented")
+}
+
+func (m *MockQuotaRepository) CheckAndReserveQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
+	if m.CheckAndReserveQuotaFn != nil {
+		return m.CheckAndReserveQuotaFn(ctx, userID, cpu, ram, storage)
+	}
+	return errors.New("CheckAndReserveQuota not implemented")
 }
 
 func (m *MockQuotaRepository) UpdateUsage(ctx context.Context, userID string, cpu float64, ram, storage int64, vmCountDelta int) error {
@@ -143,6 +151,14 @@ func (m *MockUserRepository) UpdateUserNIM(ctx context.Context, userID, nim stri
 	return errors.New("UpdateUserNIM not implemented")
 }
 
+func (m *MockUserRepository) CreateActivityLog(ctx context.Context, userID string, action string, metadata map[string]interface{}) error {
+	return nil // No-op for tests
+}
+
+func (m *MockUserRepository) GetUserActivity(ctx context.Context, userID string, limit int) ([]repository.ActivityLog, error) {
+	return nil, errors.New("GetUserActivity not implemented")
+}
+
 // TestVMUsecase_CreateVM_Success tests the success case of creating a VM
 func TestVMUsecase_CreateVM_Success(t *testing.T) {
 	// Arrange
@@ -178,8 +194,8 @@ func TestVMUsecase_CreateVM_Success(t *testing.T) {
 		}, nil
 	}
 
-	// Mock quota check (success)
-	quotaRepo.CheckQuotaFn = func(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
+	// Mock quota check and reserve (success)
+	quotaRepo.CheckAndReserveQuotaFn = func(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
 		return nil
 	}
 
@@ -197,11 +213,6 @@ func TestVMUsecase_CreateVM_Success(t *testing.T) {
 			Status:    "pending",
 			CreatedAt: now,
 		}, nil
-	}
-
-	// Mock quota usage update
-	quotaRepo.UpdateUsageFn = func(ctx context.Context, userID string, cpu float64, ram, storage int64, vmCountDelta int) error {
-		return nil
 	}
 
 	// Act
@@ -256,8 +267,8 @@ func TestVMUsecase_CreateVM_QuotaExceeded(t *testing.T) {
 		}, nil
 	}
 
-	// Mock quota check (exceeded)
-	quotaRepo.CheckQuotaFn = func(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
+	// Mock quota check and reserve (exceeded)
+	quotaRepo.CheckAndReserveQuotaFn = func(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
 		return errors.New("quota exceeded: CPU limit")
 	}
 

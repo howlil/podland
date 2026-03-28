@@ -12,6 +12,7 @@ interface VM {
   storage: number;
   status: "pending" | "running" | "stopped" | "error";
   domain: string;
+  domain_status?: "pending" | "active" | "error";
   created_at: string;
 }
 
@@ -109,6 +110,34 @@ export default function VMDetailRoute() {
         return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+    }
+  };
+
+  const getDomainStatusBadge = () => {
+    if (!vm || !vm.domain) return null;
+    const status = vm.domain_status || "pending";
+    switch (status) {
+      case "active":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+            Active
+          </span>
+        );
+      case "error":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            Error
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+            Propagating
+          </span>
+        );
     }
   };
 
@@ -219,10 +248,37 @@ export default function VMDetailRoute() {
             </h2>
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Domain</p>
-                <p className="text-lg font-mono text-gray-900 dark:text-white">
-                  {vm.domain || `${vm.name}.podland.app`}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Domain</p>
+                  {getDomainStatusBadge()}
+                </div>
+                {vm.domain ? (
+                  <a
+                    href={`https://${vm.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-lg font-mono text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-2 mt-1"
+                  >
+                    {vm.domain}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                ) : (
+                  <p className="text-lg font-mono text-gray-900 dark:text-white">
+                    {vm.name}.podland.app
+                  </p>
+                )}
+                {vm.domain_status === "pending" && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                    ⏳ DNS propagation in progress. This may take up to 5 minutes.
+                  </p>
+                )}
+                {vm.domain_status === "error" && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                    ⚠️ DNS setup failed. Please contact support.
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">SSH Access</p>

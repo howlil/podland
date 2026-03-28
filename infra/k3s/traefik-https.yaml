@@ -1,0 +1,115 @@
+# Traefik HTTPS Configuration for Podland
+# Adds HTTPS entrypoint with Origin CA certificate and HTTP→HTTPS redirection
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-https-config
+  namespace: podland
+data:
+  traefik.yaml: |
+    # Traefik HTTPS Configuration
+    entryPoints:
+      web:
+        address: ":80"
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+      websecure:
+        address: ":443"
+        http:
+          tls:
+            certResolver: ""  # Using Origin CA secret directly
+
+    # Trust Cloudflare IPs for real client IP forwarding
+    entryPoints:
+      websecure:
+        forwardedHeaders:
+          trustedIPs:
+            - 173.245.48.0/20
+            - 103.21.244.0/22
+            - 103.22.200.0/22
+            - 103.31.4.0/22
+            - 141.101.64.0/18
+            - 108.162.192.0/18
+            - 190.93.240.0/20
+            - 188.114.96.0/20
+            - 197.234.240.0/22
+            - 198.41.128.0/17
+            - 162.158.0.0/15
+            - 104.16.0.0/13
+            - 104.24.0.0/14
+            - 172.64.0.0/13
+            - 131.0.72.0/22
+
+    providers:
+      kubernetesCRD:
+        enabled: true
+        allowCrossNamespace: true
+        allowExternalNameServices: true
+      kubernetesIngress:
+        enabled: true
+        allowExternalNameServices: true
+
+---
+# Ingress for HTTP/HTTPS wildcard subdomain routing with Origin CA
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vm-http-ingress
+  namespace: podland
+  labels:
+    app: podland
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  # Wildcard rule for all VM subdomains
+  rules:
+    - host: "*.podland.app"
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: traefik
+                port:
+                  number: 80
+    - host: podland.app
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: traefik
+                port:
+                  number: 80
+  # TLS configuration for Origin CA wildcard certificate
+  tls:
+    - hosts:
+        - "*.podland.app"
+        - podland.app
+      secretName: origin-ca-cert
+
+---
+# Middleware for security headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: podland
+  labels:
+    app: podland
+spec:
+  headers:
+    customFrameOptionsValue: "DENY"
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000

@@ -98,6 +98,12 @@ func Migrate(db *sql.DB) error {
 			BEFORE UPDATE ON users
 			FOR EACH ROW
 			EXECUTE FUNCTION update_updated_at_column()`,
+
+		// Phase 3: Domain status column for VMs
+		`ALTER TABLE vms ADD COLUMN IF NOT EXISTS domain VARCHAR(255)`,
+		`ALTER TABLE vms ADD COLUMN IF NOT EXISTS domain_status VARCHAR(20) DEFAULT 'pending' CHECK (domain_status IN ('pending', 'active', 'error'))`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_domain ON vms(domain)`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_domain_status ON vms(domain_status)`,
 	}
 
 	for _, migration := range migrations {

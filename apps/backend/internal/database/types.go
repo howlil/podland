@@ -1,57 +1,9 @@
 package database
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"time"
 )
-
-// DB interface for database operations
-type DB interface {
-	// User operations
-	CreateUser(user UserCreateInput) (*User, error)
-	GetUserByID(id string) (*User, error)
-	GetUserByGitHubID(githubID string) (*User, error)
-	GetUserByEmail(email string) (*User, error)
-	UpdateUser(id string, user UserUpdateInput) error
-	UpdateUserNIM(userID, nim string) error
-
-	// Session operations
-	CreateSession(session Session) error
-	GetSessionByID(id string) (*Session, error)
-	GetSessionByRefreshToken(hash string) (*Session, error)
-	GetActiveSessionCount(userID string) (int, error)
-	RevokeSession(id string, revokedAt time.Time) error
-	RevokeOldestSession(userID string) error
-	RevokeAllUserSessions(userID string) error
-	LinkSessionReplacement(oldID, newID string) error
-	// Transaction-based session rotation (atomic operation)
-	RotateSession(oldTokenHash string, userID string, deviceInfo json.RawMessage) (*Session, error)
-
-	// Activity operations
-	CreateActivityLog(userID string, action string, metadata map[string]interface{}) error
-	GetUserActivity(userID string, limit int) ([]ActivityLog, error)
-
-	// VM operations
-	CreateVM(vm VMCreateInput) (*VM, error)
-	GetVMByID(id string) (*VM, error)
-	GetVMByIDAndUser(id, userID string) (*VM, error)
-	GetUserVMs(userID string) ([]*VM, error)
-	UpdateVM(id string, vm VMUpdateInput) error
-	DeleteVM(id string) error
-	UpdateVMStatus(id, status string) error
-
-	// Quota operations
-	CheckQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error
-	UpdateUsage(ctx context.Context, userID string, cpu float64, ram, storage int64, vmCountDelta int) error
-	GetQuota(ctx context.Context, userID string) (*Quota, error)
-	GetTier(ctx context.Context, name string) (*Tier, error)
-	GetAllTiers(ctx context.Context) ([]*Tier, error)
-
-	// Close database connection
-	Close() error
-}
 
 // User represents a user in the database
 type User struct {
@@ -142,26 +94,12 @@ type VMCreateInput struct {
 
 // VMUpdateInput represents input for updating a VM
 type VMUpdateInput struct {
-	Status       *string
-	K8sNamespace *string
+	Status        *string
+	K8sNamespace  *string
 	K8sDeployment *string
-	K8sService   *string
-	K8sPVC       *string
-	Domain       *string
-	StartedAt    *time.Time
-	StoppedAt    *time.Time
-}
-
-// sqlDB implements the DB interface
-type sqlDB struct {
-	db *sql.DB
-}
-
-// NewDB creates a new database wrapper
-func NewDB(db *sql.DB) DB {
-	return &sqlDB{db: db}
-}
-
-func (d *sqlDB) Close() error {
-	return d.db.Close()
+	K8sService    *string
+	K8sPVC        *string
+	Domain        *string
+	StartedAt     *string
+	StoppedAt     *string
 }

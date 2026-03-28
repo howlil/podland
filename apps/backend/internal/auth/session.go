@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -8,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/podland/backend/internal/database"
+	"github.com/podland/backend/internal/repository"
 )
 
 var (
@@ -39,16 +40,16 @@ type DeviceInfo struct {
 }
 
 // CreateSession creates a new session for a user
-func CreateSession(db database.DB, userID string, deviceInfo DeviceInfo) (*Session, error) {
+func CreateSession(ctx context.Context, sessionRepo repository.SessionRepository, userID string, deviceInfo DeviceInfo) (*Session, error) {
 	// Check concurrent session limit
-	count, err := db.GetActiveSessionCount(userID)
+	count, err := sessionRepo.GetActiveSessionCount(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	if count >= MaxSessionsPerUser {
 		// Revoke oldest session
-		if err := db.RevokeOldestSession(userID); err != nil {
+		if err := sessionRepo.RevokeOldestSession(ctx, userID); err != nil {
 			return nil, err
 		}
 	}
@@ -69,19 +70,20 @@ func CreateSession(db database.DB, userID string, deviceInfo DeviceInfo) (*Sessi
 		ExpiresAt:    time.Now().Add(7 * 24 * time.Hour), // 7 days
 	}
 
+	// Hash the refresh token for storage
+	refreshTokenHash := HashToken(session.RefreshToken)
+
 	// Store in database - convert DeviceInfo to JSON
 	deviceInfoJSON, err := json.Marshal(deviceInfo)
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.CreateSession(database.Session{
-		ID:               session.ID,
+	dbSession, err := sessionRepo.CreateSession(ctx, repository.SessionCreateInput{
 		UserID:           session.UserID,
-		RefreshTokenHash: HashToken(session.RefreshToken),
+		RefreshTokenHash: refreshTokenHash,
 		JTI:              session.JTI,
 		DeviceInfo:       deviceInfoJSON,
-		CreatedAt:        session.CreatedAt,
 		ExpiresAt:        session.ExpiresAt,
 	})
 
@@ -89,15 +91,17 @@ func CreateSession(db database.DB, userID string, deviceInfo DeviceInfo) (*Sessi
 		return nil, err
 	}
 
+	// Convert repository session to auth session
+	session.ID = dbSession.ID
 	return session, nil
 }
 
 // RotateRefreshToken rotates a refresh token (revoke old, create new) using atomic transaction
-func RotateRefreshToken(db database.DB, oldToken string) (*Session, error) {
+func RotateRefreshToken(ctx context.Context, sessionRepo repository.SessionRepository, oldToken string) (*Session, error) {
 	oldHash := HashToken(oldToken)
 
 	// Find and validate old token first (for error messages)
-	oldSession, err := db.GetSessionByRefreshToken(oldHash)
+	oldSession, err := sessionRepo.GetSessionByRefreshToken(ctx, oldHash)
 	if err != nil {
 		return nil, ErrSessionNotFound
 	}
@@ -108,17 +112,17 @@ func RotateRefreshToken(db database.DB, oldToken string) (*Session, error) {
 
 	if oldSession.RevokedAt != nil {
 		// Token reuse detected - security alert, revoke all sessions
-		_ = db.RevokeAllUserSessions(oldSession.UserID)
+		_ = sessionRepo.RevokeAllUserSessions(ctx, oldSession.UserID)
 		return nil, ErrTokenReuse
 	}
 
 	// Use atomic transaction-based rotation
-	dbSession, err := db.RotateSession(oldHash, oldSession.UserID, oldSession.DeviceInfo)
+	dbSession, err := sessionRepo.RotateSession(ctx, oldHash, oldSession.UserID, oldSession.DeviceInfo)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert database.Session to auth.Session
+	// Convert repository session to auth session
 	session := &Session{
 		ID:           dbSession.ID,
 		UserID:       dbSession.UserID,

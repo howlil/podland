@@ -1,12 +1,16 @@
 package repository
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 // Common repository errors
 var (
-	ErrVMNotFound    = errors.New("vm not found")
-	ErrUserNotFound  = errors.New("user not found")
-	ErrQuotaNotFound = errors.New("quota not found")
+	ErrVMNotFound       = errors.New("vm not found")
+	ErrUserNotFound     = errors.New("user not found")
+	ErrQuotaNotFound    = errors.New("quota not found")
+	ErrSessionNotFound  = errors.New("session not found")
 )
 
 // VMCreateInput represents input for creating a VM
@@ -29,6 +33,7 @@ type VMUpdateInput struct {
 	K8sService    *string
 	K8sPVC        *string
 	Domain        *string
+	DomainStatus  *string
 	StartedAt     *string
 	StoppedAt     *string
 }
@@ -49,4 +54,13 @@ type UserUpdateInput struct {
 	AvatarURL   *string
 	NIM         *string
 	Role        *string
+}
+
+// ActivityLog represents an activity log entry
+type ActivityLog struct {
+	ID        string          `json:"id"`
+	UserID    string          `json:"user_id"`
+	Action    string          `json:"action"`
+	Metadata  json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt string          `json:"created_at"`
 }

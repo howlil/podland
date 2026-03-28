@@ -12,6 +12,7 @@ import (
 // QuotaRepository defines the interface for quota data access
 type QuotaRepository interface {
 	CheckQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error
+	CheckAndReserveQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error
 	UpdateUsage(ctx context.Context, userID string, cpu float64, ram, storage int64, vmCountDelta int) error
 	GetQuota(ctx context.Context, userID string) (*entity.Quota, error)
 	GetTier(ctx context.Context, name string) (*entity.Tier, error)
@@ -28,18 +29,60 @@ func NewQuotaRepository(db *sql.DB) QuotaRepository {
 	return &quotaRepository{db: db}
 }
 
-// CheckQuota checks if user can create a VM with given resources
-// Uses SELECT FOR UPDATE to prevent race conditions
+// CheckQuota checks if user can create a VM with given resources (non-transactional read)
 func (r *quotaRepository) CheckQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
-	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{
-		Isolation: sql.LevelSerializable,
-	})
+	var cpuLimit, ramLimit, storageLimit float64
+	var vmCountLimit int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT cpu_limit, ram_limit, storage_limit, vm_count_limit
+		FROM user_quotas
+		WHERE user_id = $1
+	`, userID).Scan(&cpuLimit, &ramLimit, &storageLimit, &vmCountLimit)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("quota not found for user %s: %w", userID, ErrQuotaNotFound)
+		}
+		return fmt.Errorf("failed to get quota: %w", err)
+	}
+
+	var cpuUsed float64
+	var ramUsed, storageUsed int64
+	var vmCount int
+	err = r.db.QueryRowContext(ctx, `
+		SELECT cpu_used, ram_used, storage_used, vm_count
+		FROM user_quota_usage
+		WHERE user_id = $1
+	`, userID).Scan(&cpuUsed, &ramUsed, &storageUsed, &vmCount)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("usage not found for user %s", userID)
+		}
+		return fmt.Errorf("failed to get usage: %w", err)
+	}
+
+	if cpuUsed+cpu > cpuLimit {
+		return errors.New("quota exceeded: CPU limit")
+	}
+	if float64(ramUsed+ram) > ramLimit {
+		return errors.New("quota exceeded: RAM limit")
+	}
+	if float64(storageUsed+storage) > storageLimit {
+		return errors.New("quota exceeded: storage limit")
+	}
+	if vmCount+1 > vmCountLimit {
+		return errors.New("quota exceeded: VM count limit")
+	}
+	return nil
+}
+
+// CheckAndReserveQuota atomically checks AND reserves quota in a serializable transaction
+func (r *quotaRepository) CheckAndReserveQuota(ctx context.Context, userID string, cpu float64, ram, storage int64) error {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Lock quota row for update
 	var cpuLimit, ramLimit, storageLimit float64
 	var vmCountLimit int
 	err = tx.QueryRowContext(ctx, `
@@ -48,7 +91,6 @@ func (r *quotaRepository) CheckQuota(ctx context.Context, userID string, cpu flo
 		WHERE user_id = $1
 		FOR UPDATE
 	`, userID).Scan(&cpuLimit, &ramLimit, &storageLimit, &vmCountLimit)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("quota not found for user %s: %w", userID, ErrQuotaNotFound)
@@ -56,7 +98,6 @@ func (r *quotaRepository) CheckQuota(ctx context.Context, userID string, cpu flo
 		return fmt.Errorf("failed to get quota: %w", err)
 	}
 
-	// Get current usage
 	var cpuUsed float64
 	var ramUsed, storageUsed int64
 	var vmCount int
@@ -64,8 +105,8 @@ func (r *quotaRepository) CheckQuota(ctx context.Context, userID string, cpu flo
 		SELECT cpu_used, ram_used, storage_used, vm_count
 		FROM user_quota_usage
 		WHERE user_id = $1
+		FOR UPDATE
 	`, userID).Scan(&cpuUsed, &ramUsed, &storageUsed, &vmCount)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("usage not found for user %s", userID)
@@ -73,7 +114,6 @@ func (r *quotaRepository) CheckQuota(ctx context.Context, userID string, cpu flo
 		return fmt.Errorf("failed to get usage: %w", err)
 	}
 
-	// Check if new VM fits within quota limits
 	if cpuUsed+cpu > cpuLimit {
 		return errors.New("quota exceeded: CPU limit")
 	}
@@ -87,7 +127,20 @@ func (r *quotaRepository) CheckQuota(ctx context.Context, userID string, cpu flo
 		return errors.New("quota exceeded: VM count limit")
 	}
 
-	return nil
+	_, err = tx.ExecContext(ctx, `
+		UPDATE user_quota_usage
+		SET cpu_used = cpu_used + $1,
+		    ram_used = ram_used + $2,
+		    storage_used = storage_used + $3,
+		    vm_count = vm_count + 1,
+		    updated_at = NOW()
+		WHERE user_id = $4
+	`, cpu, ram, storage, userID)
+	if err != nil {
+		return fmt.Errorf("failed to reserve quota: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 // UpdateUsage updates quota usage after VM create/delete

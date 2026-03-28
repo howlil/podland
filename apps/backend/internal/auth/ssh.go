@@ -1,5 +1,5 @@
-// Package ssh provides SSH key generation utilities
-package ssh
+// Package auth provides authentication and SSH key generation utilities
+package auth
 
 import (
 	"crypto/ed25519"

@@ -39,11 +39,11 @@ func GetHTTPClient(ctx context.Context, token *oauth2.Token) *http.Client {
 
 // GitHubUser represents a GitHub user response
 type GitHubUser struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Login     string `json:"login"`
-	AvatarURL string `json:"avatar_url"`
-	Email     string `json:"email"`
+	ID        json.Number `json:"id"`
+	Name      string      `json:"name"`
+	Login     string      `json:"login"`
+	AvatarURL string      `json:"avatar_url"`
+	Email     string      `json:"email"`
 }
 
 // GitHubEmail represents a GitHub email response
@@ -122,13 +122,8 @@ func ExtractNIM(email string) string {
 
 // AssignRole assigns a role based on NIM
 func AssignRole(nim string) string {
-	// NIM contains "1152" = Internal (SI UNAND student)
-	if len(nim) >= 4 {
-		for i := 0; i <= len(nim)-4; i++ {
-			if nim[i:i+4] == "1152" {
-				return "internal"
-			}
-		}
+	if len(nim) >= 6 && nim[2:6] == "1152" {
+		return "internal"
 	}
 	return "external"
 }

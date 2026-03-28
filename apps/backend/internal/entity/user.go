@@ -38,5 +38,5 @@ func (u *User) HasNIM() bool {
 // IsStudent returns true if NIM contains student pattern (e.g., 1152)
 func (u *User) IsStudent() bool {
 	// Students have NIM containing "1152"
-	return len(u.NIM) >= 4 && u.NIM[:4] == "1152"
+	return len(u.NIM) >= 6 && u.NIM[2:6] == "1152"
 }

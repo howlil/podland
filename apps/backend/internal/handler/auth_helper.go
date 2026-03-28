@@ -1,11 +1,11 @@
-package middleware
+package handler
 
 import (
 	"context"
 	"net/http"
 )
 
-// AuthHelper provides authentication helper functions
+// AuthHelper provides authentication helper functions for handlers
 type AuthHelper struct{}
 
 // NewAuthHelper creates a new auth helper

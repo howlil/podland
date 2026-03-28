@@ -2,28 +2,39 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	authmw "github.com/podland/backend/handler/middleware"
+	"github.com/podland/backend/internal/auth"
+	"github.com/podland/backend/internal/cloudflare"
+	"github.com/podland/backend/internal/domain"
 	"github.com/podland/backend/internal/entity"
+	"github.com/podland/backend/internal/repository"
 	"github.com/podland/backend/internal/usecase"
-	sshkey "github.com/podland/backend/internal/ssh"
 	"github.com/podland/backend/pkg/response"
 )
 
 // VMHandler handles VM HTTP requests
 type VMHandler struct {
 	vmUsecase  *usecase.VMUsecase
-	authHelper *authmw.AuthHelper
+	vmRepo     repository.VMRepository
+	dnsManager *cloudflare.DNSManager
+	dnsPoller  *domain.DNSPoller
+	authHelper *AuthHelper
 }
 
 // NewVMHandler creates a new VM handler with dependencies
-func NewVMHandler(vmUsecase *usecase.VMUsecase) *VMHandler {
+func NewVMHandler(vmUsecase *usecase.VMUsecase, vmRepo repository.VMRepository, dnsManager *cloudflare.DNSManager, dnsPoller *domain.DNSPoller) *VMHandler {
 	return &VMHandler{
 		vmUsecase:  vmUsecase,
-		authHelper: authmw.NewAuthHelper(),
+		vmRepo:     vmRepo,
+		dnsManager: dnsManager,
+		dnsPoller:  dnsPoller,
+		authHelper: NewAuthHelper(),
 	}
 }
 
@@ -61,39 +72,39 @@ type VMResponse struct {
 func (h *VMHandler) HandleCreateVM(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	var req CreateVMRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid request body")
+		pkgresponse.BadRequest(w, "Invalid request body")
 		return
 	}
 
 	// Validate input
 	if req.Name == "" {
-		response.BadRequest(w, "VM name is required")
+		pkgresponse.BadRequest(w, "VM name is required")
 		return
 	}
 	if req.OS == "" {
 		req.OS = "ubuntu-2204"
 	}
 	if req.Tier == "" {
-		response.BadRequest(w, "Tier is required")
+		pkgresponse.BadRequest(w, "Tier is required")
 		return
 	}
 
 	// Validate OS
 	if req.OS != "ubuntu-2204" && req.OS != "debian-12" {
-		response.BadRequest(w, "Invalid OS. Must be 'ubuntu-2204' or 'debian-12'")
+		pkgresponse.BadRequest(w, "Invalid OS. Must be 'ubuntu-2204' or 'debian-12'")
 		return
 	}
 
 	// Generate SSH keypair
-	privateKey, publicKey, err := sshkey.GenerateKeyPair()
+	privateKey, publicKey, err := auth.GenerateKeyPair()
 	if err != nil {
-		response.InternalError(w, "Failed to generate SSH key")
+		pkgresponse.InternalError(w, "Failed to generate SSH key")
 		return
 	}
 
@@ -109,8 +120,46 @@ func (h *VMHandler) HandleCreateVM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create DNS record if DNS manager is configured
+	if h.dnsManager != nil && h.dnsPoller != nil {
+		// Generate subdomain from VM name
+		subdomain := sanitizeSubdomain(req.Name)
+		domain := subdomain + ".podland.app"
+
+		// Handle collisions by appending user ID suffix
+		if existing, _ := h.vmRepo.GetVMByIDAndUser(r.Context(), vm.ID, userID); existing != nil && existing.Domain != nil {
+			// Check if domain already exists
+			if _, err := h.dnsManager.GetRecordByName(r.Context(), domain); err == nil {
+				// Domain collision - append user ID
+				subdomain = sanitizeSubdomain(req.Name) + "-u" + userID[:8]
+				domain = subdomain + ".podland.app"
+			}
+		}
+
+		// Create DNS record
+		_, err = h.dnsManager.CreateCNAME(r.Context(), domain, "tunnel.podland.app")
+		if err != nil {
+			// Log error but don't fail VM creation
+			log.Printf("WARNING: Failed to create DNS record for VM %s: %v", vm.ID, err)
+		} else {
+			// Update VM with domain
+			if err := h.vmRepo.UpdateVM(r.Context(), vm.ID, repository.VMUpdateInput{
+				Domain:       &domain,
+				DomainStatus: stringPtr("pending"),
+			}); err != nil {
+				log.Printf("WARNING: Failed to update VM with domain: %v", err)
+			}
+
+			// Start background DNS poller (async)
+			h.dnsPoller.StartDNSPoller(vm.ID, domain)
+		}
+
+		// Refresh VM entity with domain
+		vm, _ = h.vmRepo.GetVMByID(r.Context(), vm.ID)
+	}
+
 	// Return 202 Accepted
-	response.Accepted(w, CreateVMResponse{
+	pkgresponse.Accepted(w, CreateVMResponse{
 		ID:      vm.ID,
 		Status:  vm.Status,
 		SSHKey:  privateKey,
@@ -121,13 +170,13 @@ func (h *VMHandler) HandleCreateVM(w http.ResponseWriter, r *http.Request) {
 func (h *VMHandler) handleCreateVMError(w http.ResponseWriter, err error) {
 	switch err {
 	case usecase.ErrInvalidRequest:
-		response.BadRequest(w, "Invalid request")
+		pkgresponse.BadRequest(w, "Invalid request")
 	case usecase.ErrTierNotAvailable:
-		response.Forbidden(w, "Tier not available for your role")
+		pkgresponse.Forbidden(w, "Tier not available for your role")
 	case usecase.ErrQuotaExceeded:
-		response.Forbidden(w, "Quota exceeded")
+		pkgresponse.Forbidden(w, "Quota exceeded")
 	default:
-		response.InternalError(w, "Failed to create VM")
+		pkgresponse.InternalError(w, "Failed to create VM")
 	}
 }
 
@@ -136,17 +185,17 @@ func (h *VMHandler) handleCreateVMError(w http.ResponseWriter, err error) {
 func (h *VMHandler) HandleListVMs(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	vms, err := h.vmUsecase.ListVMs(r.Context(), userID)
 	if err != nil {
-		response.InternalError(w, "Failed to list VMs")
+		pkgresponse.InternalError(w, "Failed to list VMs")
 		return
 	}
 
-	response.Success(w, http.StatusOK, h.toVMResponse(vms))
+	pkgresponse.Success(w, http.StatusOK, h.toVMResponse(vms))
 }
 
 // HandleGetVM gets details for a specific VM
@@ -154,27 +203,27 @@ func (h *VMHandler) HandleListVMs(w http.ResponseWriter, r *http.Request) {
 func (h *VMHandler) HandleGetVM(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	vmID := chi.URLParam(r, "id")
 	if vmID == "" {
-		response.BadRequest(w, "VM ID is required")
+		pkgresponse.BadRequest(w, "VM ID is required")
 		return
 	}
 
 	vm, err := h.vmUsecase.GetVMByID(r.Context(), vmID, userID)
 	if err != nil {
 		if err == usecase.ErrVMNotFound {
-			response.NotFound(w, "VM not found")
+			pkgresponse.NotFound(w, "VM not found")
 			return
 		}
-		response.InternalError(w, "Failed to get VM")
+		pkgresponse.InternalError(w, "Failed to get VM")
 		return
 	}
 
-	response.Success(w, http.StatusOK, h.toVMResponseSingle(vm))
+	pkgresponse.Success(w, http.StatusOK, h.toVMResponseSingle(vm))
 }
 
 // HandleStartVM starts a stopped VM
@@ -182,13 +231,13 @@ func (h *VMHandler) HandleGetVM(w http.ResponseWriter, r *http.Request) {
 func (h *VMHandler) HandleStartVM(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	vmID := chi.URLParam(r, "id")
 	if vmID == "" {
-		response.BadRequest(w, "VM ID is required")
+		pkgresponse.BadRequest(w, "VM ID is required")
 		return
 	}
 
@@ -197,7 +246,7 @@ func (h *VMHandler) HandleStartVM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Accepted(w, map[string]string{"status": "pending"})
+	pkgresponse.Accepted(w, map[string]string{"status": "pending"})
 }
 
 // HandleStopVM stops a running VM
@@ -205,13 +254,13 @@ func (h *VMHandler) HandleStartVM(w http.ResponseWriter, r *http.Request) {
 func (h *VMHandler) HandleStopVM(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	vmID := chi.URLParam(r, "id")
 	if vmID == "" {
-		response.BadRequest(w, "VM ID is required")
+		pkgresponse.BadRequest(w, "VM ID is required")
 		return
 	}
 
@@ -220,7 +269,7 @@ func (h *VMHandler) HandleStopVM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Accepted(w, map[string]string{"status": "stopped"})
+	pkgresponse.Accepted(w, map[string]string{"status": "stopped"})
 }
 
 // HandleRestartVM restarts a running VM
@@ -228,13 +277,13 @@ func (h *VMHandler) HandleStopVM(w http.ResponseWriter, r *http.Request) {
 func (h *VMHandler) HandleRestartVM(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	vmID := chi.URLParam(r, "id")
 	if vmID == "" {
-		response.BadRequest(w, "VM ID is required")
+		pkgresponse.BadRequest(w, "VM ID is required")
 		return
 	}
 
@@ -243,7 +292,7 @@ func (h *VMHandler) HandleRestartVM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Accepted(w, map[string]string{"status": "pending"})
+	pkgresponse.Accepted(w, map[string]string{"status": "pending"})
 }
 
 // HandleDeleteVM deletes a VM
@@ -251,64 +300,84 @@ func (h *VMHandler) HandleRestartVM(w http.ResponseWriter, r *http.Request) {
 func (h *VMHandler) HandleDeleteVM(w http.ResponseWriter, r *http.Request) {
 	userID := h.authHelper.GetAuthUserID(r)
 	if userID == "" {
-		response.Unauthorized(w, "Unauthorized")
+		pkgresponse.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	vmID := chi.URLParam(r, "id")
 	if vmID == "" {
-		response.BadRequest(w, "VM ID is required")
+		pkgresponse.BadRequest(w, "VM ID is required")
 		return
 	}
 
+	// Get VM to retrieve domain (before deletion)
+	var domainToDelete string
+	if h.dnsManager != nil {
+		vm, err := h.vmRepo.GetVMByID(r.Context(), vmID)
+		if err == nil && vm != nil && vm.Domain != nil {
+			domainToDelete = *vm.Domain
+		}
+	}
+
+	// Delete DNS record first (if domain exists)
+	if h.dnsManager != nil && domainToDelete != "" {
+		dnsRecord, err := h.dnsManager.GetRecordByName(r.Context(), domainToDelete)
+		if err == nil && dnsRecord != nil {
+			if err := h.dnsManager.DeleteRecord(r.Context(), dnsRecord.ID); err != nil {
+				log.Printf("WARNING: Failed to delete DNS record for VM %s: %v", vmID, err)
+			}
+		}
+	}
+
+	// Delete VM in usecase (which releases quota and soft-deletes)
 	if err := h.vmUsecase.DeleteVM(r.Context(), vmID, userID); err != nil {
 		if err == usecase.ErrVMNotFound {
-			response.NotFound(w, "VM not found")
+			pkgresponse.NotFound(w, "VM not found")
 			return
 		}
-		response.InternalError(w, "Failed to delete VM")
+		pkgresponse.InternalError(w, "Failed to delete VM")
 		return
 	}
 
-	response.NoContent(w)
+	pkgresponse.NoContent(w)
 }
 
 // Error handlers
 
 func (h *VMHandler) handleStartVMError(w http.ResponseWriter, err error) {
 	if err == usecase.ErrVMNotFound {
-		response.NotFound(w, "VM not found")
+		pkgresponse.NotFound(w, "VM not found")
 		return
 	}
 	if err == usecase.ErrVMNotStopped {
-		response.BadRequest(w, "VM must be stopped to start")
+		pkgresponse.BadRequest(w, "VM must be stopped to start")
 		return
 	}
-	response.InternalError(w, "Failed to start VM")
+	pkgresponse.InternalError(w, "Failed to start VM")
 }
 
 func (h *VMHandler) handleStopVMError(w http.ResponseWriter, err error) {
 	if err == usecase.ErrVMNotFound {
-		response.NotFound(w, "VM not found")
+		pkgresponse.NotFound(w, "VM not found")
 		return
 	}
 	if err == usecase.ErrVMNotRunning {
-		response.BadRequest(w, "VM must be running to stop")
+		pkgresponse.BadRequest(w, "VM must be running to stop")
 		return
 	}
-	response.InternalError(w, "Failed to stop VM")
+	pkgresponse.InternalError(w, "Failed to stop VM")
 }
 
 func (h *VMHandler) handleRestartVMError(w http.ResponseWriter, err error) {
 	if err == usecase.ErrVMNotFound {
-		response.NotFound(w, "VM not found")
+		pkgresponse.NotFound(w, "VM not found")
 		return
 	}
 	if err == usecase.ErrVMNotRunning {
-		response.BadRequest(w, "VM must be running to restart")
+		pkgresponse.BadRequest(w, "VM must be running to restart")
 		return
 	}
-	response.InternalError(w, "Failed to restart VM")
+	pkgresponse.InternalError(w, "Failed to restart VM")
 }
 
 func (h *VMHandler) toVMResponse(vms []*entity.VM) []VMResponse {
@@ -323,7 +392,7 @@ func (h *VMHandler) toVMResponse(vms []*entity.VM) []VMResponse {
 			RAM:       vm.RAM,
 			Storage:   vm.Storage,
 			Status:    vm.Status,
-			Domain:    vm.Domain,
+			Domain:    getString(vm.Domain),
 			CreatedAt: vm.CreatedAt,
 		}
 	}
@@ -340,7 +409,7 @@ func (h *VMHandler) toVMResponseSingle(vm *entity.VM) VMResponse {
 		RAM:       vm.RAM,
 		Storage:   vm.Storage,
 		Status:    vm.Status,
-		Domain:    vm.Domain,
+		Domain:    getString(vm.Domain),
 		CreatedAt: vm.CreatedAt,
 	}
 }
@@ -350,4 +419,28 @@ func getString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// sanitizeSubdomain converts a VM name to a valid DNS subdomain
+func sanitizeSubdomain(name string) string {
+	// Lowercase
+	s := strings.ToLower(name)
+	// Replace spaces and special chars with hyphens
+	s = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(s, "-")
+	// Remove leading/trailing hyphens
+	s = strings.Trim(s, "-")
+	// Limit to 63 chars (DNS spec)
+	if len(s) > 63 {
+		s = s[:63]
+	}
+	// Ensure not empty
+	if s == "" {
+		s = "vm"
+	}
+	return s
+}
+
+// stringPtr returns a pointer to a string
+func stringPtr(s string) *string {
+	return &s
 }

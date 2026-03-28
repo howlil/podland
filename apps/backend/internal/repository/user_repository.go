@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -17,6 +18,8 @@ type UserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	UpdateUser(ctx context.Context, id string, input UserUpdateInput) error
 	UpdateUserNIM(ctx context.Context, userID, nim string) error
+	CreateActivityLog(ctx context.Context, userID string, action string, metadata map[string]interface{}) error
+	GetUserActivity(ctx context.Context, userID string, limit int) ([]ActivityLog, error)
 }
 
 // userRepository implements UserRepository
@@ -177,7 +180,7 @@ func (r *userRepository) UpdateUserNIM(ctx context.Context, userID, nim string) 
 		UPDATE users
 		SET nim = $1,
 			role = CASE
-				WHEN $1 LIKE '%1152%' THEN 'internal'
+				WHEN LENGTH($1) >= 6 AND SUBSTRING($1, 3, 4) = '1152' THEN 'internal'
 				ELSE 'external'
 			END,
 			updated_at = NOW()
@@ -186,4 +189,63 @@ func (r *userRepository) UpdateUserNIM(ctx context.Context, userID, nim string) 
 
 	_, err := r.db.ExecContext(ctx, query, nim, userID)
 	return err
+}
+
+// CreateActivityLog creates an activity log entry
+func (r *userRepository) CreateActivityLog(ctx context.Context, userID string, action string, metadata map[string]interface{}) error {
+	query := `
+		INSERT INTO activity_logs (user_id, action, metadata, created_at)
+		VALUES ($1, $2, $3, NOW())
+	`
+
+	var metadataJSON []byte
+	if metadata != nil {
+		var err error
+		metadataJSON, err = json.Marshal(metadata)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err := r.db.ExecContext(ctx, query, userID, action, metadataJSON)
+	return err
+}
+
+// GetUserActivity gets activity logs for a user
+func (r *userRepository) GetUserActivity(ctx context.Context, userID string, limit int) ([]ActivityLog, error) {
+	query := `
+		SELECT id, user_id, action, metadata, created_at
+		FROM activity_logs
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []ActivityLog
+	for rows.Next() {
+		var log ActivityLog
+		err := rows.Scan(
+			&log.ID,
+			&log.UserID,
+			&log.Action,
+			&log.Metadata,
+			&log.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		logs = append(logs, log)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return logs, nil
 }

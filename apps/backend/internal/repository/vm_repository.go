@@ -240,10 +240,11 @@ func (r *vmRepository) UpdateVM(ctx context.Context, id string, input VMUpdateIn
 			k8s_service = COALESCE($4, k8s_service),
 			k8s_pvc = COALESCE($5, k8s_pvc),
 			domain = COALESCE($6, domain),
-			started_at = COALESCE($7, started_at),
-			stopped_at = COALESCE($8, stopped_at),
+			domain_status = COALESCE($7, domain_status),
+			started_at = COALESCE($8, started_at),
+			stopped_at = COALESCE($9, stopped_at),
 			updated_at = NOW()
-		WHERE id = $9
+		WHERE id = $10
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -253,6 +254,7 @@ func (r *vmRepository) UpdateVM(ctx context.Context, id string, input VMUpdateIn
 		input.K8sService,
 		input.K8sPVC,
 		input.Domain,
+		input.DomainStatus,
 		input.StartedAt,
 		input.StoppedAt,
 		id,

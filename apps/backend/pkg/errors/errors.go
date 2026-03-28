@@ -1,4 +1,5 @@
-package errors
+// Package pkgerrors provides application error types and utilities
+package pkgerrors
 
 import (
 	"errors"

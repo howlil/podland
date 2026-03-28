@@ -13,8 +13,8 @@ type VM struct {
 	RAM          int64
 	Storage      int64
 	Status       string
-	Domain       string
-	SSHPublicKey string
+	Domain       *string
+	SSHPublicKey *string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	StartedAt    *time.Time
