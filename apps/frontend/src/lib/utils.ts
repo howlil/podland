@@ -19,6 +19,25 @@ export function formatBytes(bytes: number, decimals = 2): string {
 }
 
 /**
+ * Format date to locale date string
+ * @param date - Date string or Date object
+ * @param options - Intl.DateTimeFormatOptions (optional)
+ * @returns Formatted date string
+ */
+export function formatDate(
+  date: string | Date,
+  format: "date" | "datetime" | "time" = "date"
+): string {
+  const d = typeof date === "string" ? new Date(date) : date
+  const options: Intl.DateTimeFormatOptions = {
+    date: { year: "numeric", month: "short", day: "numeric" },
+    datetime: { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" },
+    time: { hour: "2-digit", minute: "2-digit" },
+  }[format] as Intl.DateTimeFormatOptions
+  return d.toLocaleDateString(undefined, options)
+}
+
+/**
  * Format date to relative time (e.g., "2 hours ago")
  * @param date - Date string or Date object
  * @returns Relative time string

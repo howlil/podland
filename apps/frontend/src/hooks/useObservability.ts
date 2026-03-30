@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { REFRESH_INTERVALS } from "@/lib/constants";
 
 type ActiveTab = "metrics" | "logs" | "alerts";
 type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d";
@@ -15,7 +16,7 @@ export function useObservability(vmId: string) {
       const { data } = await api.get(`/vms/${vmId}/metrics?range=${timeRange}`);
       return data;
     },
-    refetchInterval: 30000,
+    refetchInterval: REFRESH_INTERVALS.METRICS,
     enabled: activeTab === "metrics" && !!vmId,
   });
 
@@ -25,7 +26,7 @@ export function useObservability(vmId: string) {
       const { data } = await api.get(`/vms/${vmId}/logs?limit=1000`);
       return data;
     },
-    refetchInterval: activeTab === "logs" ? 5000 : false,
+    refetchInterval: activeTab === "logs" ? REFRESH_INTERVALS.LOGS_LIVE : false,
     enabled: activeTab === "logs" && !!vmId,
   });
 

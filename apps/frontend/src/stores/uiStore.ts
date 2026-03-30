@@ -1,3 +1,8 @@
+/**
+ * @deprecated UI Store for VM list state - Currently unused.
+ * Remove if not needed in future iterations (YAGNI principle).
+ * VMsPage currently uses local state instead.
+ */
 import { create } from "zustand";
 
 interface UIState {

@@ -1,6 +1,8 @@
 import { VM } from "@/hooks/useVMs";
 import { formatBytes } from "@/lib/utils";
 import { Server, Trash2, Play, Square, RotateCcw } from "lucide-react";
+import { VMStatusBadge } from "@/components/vm/VMStatusBadge";
+import { canStartVM, canStopVM } from "@/lib/vm-utils";
 
 interface VMTableProps {
   vms: VM[];
@@ -72,21 +74,6 @@ interface VMRowProps {
 }
 
 function VMRow({ vm, onStart, onStop, onRestart, onDelete }: VMRowProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "running":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "stopped":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case "error":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-    }
-  };
-
   return (
     <a
       href={`/dashboard/vms/${vm.id}`}
@@ -106,16 +93,14 @@ function VMRow({ vm, onStart, onStop, onRestart, onDelete }: VMRowProps) {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vm.status)}`}>
-          {vm.status}
-        </span>
+        <VMStatusBadge status={vm.status} />
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {vm.status === "stopped" && (
+          {canStartVM(vm.status) && (
             <button onClick={(e) => { e.preventDefault(); onStart?.(vm.id); }} className="p-2 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg" title="Start">
               <Play className="h-4 w-4 text-green-600" />
             </button>
           )}
-          {vm.status === "running" && (
+          {canStopVM(vm.status) && (
             <>
               <button onClick={(e) => { e.preventDefault(); onStop?.(vm.id); }} className="p-2 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg" title="Stop">
                 <Square className="h-4 w-4 text-yellow-600" />

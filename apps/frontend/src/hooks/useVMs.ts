@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errorHandler";
+import { REFRESH_INTERVALS } from "@/lib/constants";
 
 export interface VM {
   id: string;
@@ -25,7 +27,7 @@ export function useVMs() {
       const { data } = await api.get("/vms");
       return data;
     },
-    refetchInterval: 5000,
+    refetchInterval: REFRESH_INTERVALS.VM_STATUS,
     retry: 2,
   });
 
@@ -36,7 +38,7 @@ export function useVMs() {
       toast.success("VM started successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to start VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to start VM"));
     },
   });
 
@@ -47,7 +49,7 @@ export function useVMs() {
       toast.success("VM stopped successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to stop VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to stop VM"));
     },
   });
 
@@ -58,7 +60,7 @@ export function useVMs() {
       toast.success("VM deleted successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to delete VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to delete VM"));
     },
   });
 
@@ -85,7 +87,7 @@ export function useVM(id: string) {
       const { data } = await api.get(`/vms/${id}`);
       return data;
     },
-    refetchInterval: 5000,
+    refetchInterval: REFRESH_INTERVALS.VM_DETAIL,
     enabled: !!id,
   });
 
@@ -97,7 +99,7 @@ export function useVM(id: string) {
       toast.success("VM started successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to start VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to start VM"));
     },
   });
 
@@ -109,7 +111,7 @@ export function useVM(id: string) {
       toast.success("VM stopped successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to stop VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to stop VM"));
     },
   });
 
@@ -121,7 +123,7 @@ export function useVM(id: string) {
       toast.success("VM deleted successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to delete VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to delete VM"));
     },
   });
 
@@ -133,7 +135,7 @@ export function useVM(id: string) {
       toast.success("VM restarted successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to restart VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to restart VM"));
     },
   });
 
@@ -144,7 +146,7 @@ export function useVM(id: string) {
       toast.success("VM pinned successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to pin VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to pin VM"));
     },
   });
 
@@ -155,7 +157,7 @@ export function useVM(id: string) {
       toast.success("VM unpinned successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to unpin VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to unpin VM"));
     },
   });
 

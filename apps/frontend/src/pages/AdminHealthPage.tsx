@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { REFRESH_INTERVALS } from '@/lib/constants'
 
 export const Route = createFileRoute('/admin-health')({
   component: AdminHealthPage,
@@ -15,7 +16,7 @@ export default function AdminHealthPage() {
       if (!response.ok) throw new Error('Failed to fetch health')
       return response.json()
     },
-    refetchInterval: 30000, // Refresh every 30s
+    refetchInterval: REFRESH_INTERVALS.HEALTH,
   })
 
   if (isLoading) return <div>Loading...</div>

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errorHandler";
 
 export interface User {
   id: string;
@@ -32,7 +33,7 @@ export function useAdminUsers(roleFilter?: string) {
       toast.success("User role updated successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to update role: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to update role"));
     },
   });
 
@@ -46,7 +47,7 @@ export function useAdminUsers(roleFilter?: string) {
       toast.success("User banned successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to ban user: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to ban user"));
     },
   });
 
@@ -60,7 +61,7 @@ export function useAdminUsers(roleFilter?: string) {
       toast.success("User unbanned successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to unban user: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(getErrorMessage(error, "Failed to unban user"));
     },
   });
 

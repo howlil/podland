@@ -1,5 +1,6 @@
 import { VM } from "@/hooks/useVMs";
 import { Pin, PinOff, ArrowLeft, Server } from "lucide-react";
+import { getVMStatusStyles } from "@/lib/vm-utils";
 
 interface VMHeaderProps {
   vm?: VM;
@@ -27,21 +28,6 @@ export function VMHeader({ vm, isLoading, onPin, onUnpin, isPinning, isUnpinning
   }
 
   if (!vm) return null;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "running":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "stopped":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case "error":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-    }
-  };
 
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
@@ -92,7 +78,7 @@ export function VMHeader({ vm, isLoading, onPin, onUnpin, isPinning, isUnpinning
             {isPinning ? "..." : "Pin VM"}
           </button>
         )}
-        <span className={`inline-flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-full ${getStatusColor(vm.status)}`}>
+        <span className={`inline-flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-full ${getVMStatusStyles(vm.status)}`}>
           {vm.status.toUpperCase()}
         </span>
       </div>

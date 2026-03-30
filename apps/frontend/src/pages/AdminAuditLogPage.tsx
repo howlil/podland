@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { formatDate } from '@/lib/utils'
+import { REFRESH_INTERVALS } from '@/lib/constants'
 
 export const Route = createFileRoute('/admin-audit-log')({
   component: AdminAuditLogPage,
@@ -24,7 +26,7 @@ export default function AdminAuditLogPage() {
       if (!response.ok) throw new Error('Failed to fetch audit logs')
       return response.json()
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: REFRESH_INTERVALS.AUDIT_LOG,
   })
 
   if (isLoading) return <div>Loading...</div>
@@ -49,7 +51,7 @@ export default function AdminAuditLogPage() {
               {logs?.data?.map((log: AuditLog) => (
                 <tr key={log.id} className="border-b">
                   <td className="px-6 py-4">
-                    <Badge variant="outline">{new Date(log.created_at).toLocaleString()}</Badge>
+                    <Badge variant="outline">{formatDate(log.created_at, 'datetime')}</Badge>
                   </td>
                   <td className="px-6 py-4 font-mono text-sm">{log.user_id}</td>
                   <td className="px-6 py-4 font-mono text-sm">{log.action}</td>

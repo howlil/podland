@@ -1,6 +1,7 @@
 import { User } from "@/hooks/useAdminUsers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
 
 interface UserTableProps {
   users?: User[];
@@ -95,7 +96,7 @@ export function UserTable({ users, isLoading, onChangeRole, onBan, onUnban, isCh
                 <div className="text-sm text-gray-600 dark:text-gray-300">{user.nim || "-"}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-600 dark:text-gray-300">{new Date(user.created_at).toLocaleDateString()}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-300">{formatDate(user.created_at)}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
                 <div className="flex justify-end gap-2">

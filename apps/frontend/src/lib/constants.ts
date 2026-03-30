@@ -2,13 +2,20 @@
  * Application-wide constants
  */
 
-// Polling intervals (milliseconds)
-export const POLLING_INTERVALS = {
-  VM_STATUS: 5000,        // VM status polling
-  QUOTA_USAGE: 30000,     // Quota usage refresh
-  ACTIVITY_LOG: 10000,    // Activity log refresh
-  METRICS: 60000,         // Metrics refresh
+// Refresh intervals (milliseconds)
+export const REFRESH_INTERVALS = {
+  VM_STATUS: 5000,        // VM status polling (5s)
+  VM_DETAIL: 5000,        // Single VM detail polling (5s)
+  QUOTA_USAGE: 30000,     // Quota usage refresh (30s)
+  ACTIVITY_LOG: 10000,    // Activity log refresh (10s)
+  METRICS: 30000,         // Metrics refresh (30s)
+  LOGS_LIVE: 5000,        // Live logs refresh (5s)
+  HEALTH: 30000,          // System health refresh (30s)
+  AUDIT_LOG: 60000,       // Audit log refresh (60s)
 } as const;
+
+// Polling intervals (deprecated - use REFRESH_INTERVALS)
+export const POLLING_INTERVALS = REFRESH_INTERVALS;
 
 // Token refresh timing (milliseconds)
 export const AUTH = {
