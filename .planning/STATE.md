@@ -27,7 +27,7 @@
 **Phase:** Phase 6 (Security) — Ready to start
 **Plan:** 6 phases (6-11) for v1.1 Hardening & Polish
 **Status:** Roadmap defined, awaiting execution
-**Last activity:** 2026-03-30 — v1.1 roadmap created
+**Last activity:** 2026-03-30 — Completed quick task 260330-001: Fix frontend import issues
 
 ---
 
@@ -84,6 +84,14 @@ None — All blockers resolved
 
 ---
 
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260330-001 | Fix frontend import issues (missing imports, path alias, unused imports) | 2026-03-30 | pending | [260330-001-frontend-import-fixes](./quick/260330-001-frontend-import-fixes/) |
+
+---
+
 ## Accumulated Context
 
 **Decisions Log:** See `.planning/PROJECT.md` — Key Decisions table (7 decisions, all validated)
@@ -110,4 +118,4 @@ None — All blockers resolved
 
 ---
 
-*State updated: 2026-03-30 after v1.1 roadmap complete*
+*State updated: 2026-03-30 after quick task 260330-001 (frontend import fixes)*

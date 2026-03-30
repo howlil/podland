@@ -65,8 +65,8 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
         onClose();
       }
     };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleEscape as EventListener);
+    return () => document.removeEventListener('keydown', handleEscape as EventListener);
   }, [onClose]);
   
   // Focus trap: Keep focus within modal
@@ -81,7 +81,7 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
       
       const handleTabKey = (e: KeyboardEvent) => {
         if (e.key !== 'Tab') return;
-        
+
         if (e.shiftKey) {
           if (document.activeElement === firstElement) {
             e.preventDefault();
@@ -94,9 +94,9 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
           }
         }
       };
-      
-      modal.addEventListener('keydown', handleTabKey);
-      return () => modal.removeEventListener('keydown', handleTabKey);
+
+      modal.addEventListener('keydown', handleTabKey as EventListener);
+      return () => modal.removeEventListener('keydown', handleTabKey as EventListener);
     }
   }, []);
 
