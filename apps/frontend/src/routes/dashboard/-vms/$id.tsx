@@ -1,6 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { MetricsSummary } from "@/components/observability/MetricsSummary";
+import { LogViewer } from "@/components/observability/LogViewer";
+import { 
+  Server, Globe, Shield, Zap, Terminal, Pin, PinOff, 
+  Play, Square, RotateCcw, Trash2, Download, ExternalLink,
+  ArrowLeft, Clock, HardDrive, Cpu, MemoryStick
+} from "lucide-react";
 
 interface VM {
   id: string;
@@ -13,6 +21,7 @@ interface VM {
   status: "pending" | "running" | "stopped" | "error";
   domain: string;
   domain_status?: "pending" | "active" | "error";
+  is_pinned?: boolean;
   created_at: string;
 }
 
@@ -68,34 +77,54 @@ export default function VMDetailRoute() {
     },
   });
 
+  const pinMutation = useMutation({
+    mutationFn: () => api.post(`/vms/${id}/pin`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vm", id] });
+    },
+  });
+
+  const unpinMutation = useMutation({
+    mutationFn: () => api.delete(`/vms/${id}/pin`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vm", id] });
+    },
+  });
+
   const handleStart = () => {
-    if (confirm("Start this VM?")) {
-      startMutation.mutate();
-    }
+    toast.loading("Starting VM...", { id: `vm-${id}` });
+    startMutation.mutate();
   };
 
   const handleStop = () => {
-    if (confirm("Stop this VM?")) {
-      stopMutation.mutate();
-    }
+    toast.loading("Stopping VM...", { id: `vm-${id}` });
+    stopMutation.mutate();
   };
 
   const handleRestart = () => {
-    if (confirm("Restart this VM?")) {
-      restartMutation.mutate();
-    }
+    toast.loading("Restarting VM...", { id: `vm-${id}` });
+    restartMutation.mutate();
   };
 
   const handleDelete = () => {
-    if (confirm("Are you sure you want to delete this VM? This action cannot be undone.")) {
-      deleteMutation.mutate();
-    }
+    toast.loading("Deleting VM...", { id: `vm-${id}` });
+    deleteMutation.mutate();
+  };
+
+  const handlePin = () => {
+    toast.loading(vm?.is_pinned ? "Unpinning VM..." : "Pinning VM...", { id: `vm-${id}-pin` });
+    pinMutation.mutate();
+  };
+
+  const handleUnpin = () => {
+    toast.loading("Unpinning VM...", { id: `vm-${id}-pin` });
+    unpinMutation.mutate();
   };
 
   const handleDownloadSSHKey = () => {
-    // In a real implementation, the SSH key would be fetched from the API
-    // For now, show a message that it's only shown once
-    alert("SSH private key is only shown once during VM creation. If you didn't save it, you'll need to delete and recreate the VM.");
+    toast.info("SSH key was shown only during VM creation", {
+      description: "You'll need to recreate the VM if you didn't save it."
+    });
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -119,22 +148,22 @@ export default function VMDetailRoute() {
     switch (status) {
       case "active":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
             Active
           </span>
         );
       case "error":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-xs font-medium">
+            <Shield className="w-3 h-3" />
             Error
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-xs font-medium">
+            <Clock className="w-3 h-3 animate-pulse" />
             Propagating
           </span>
         );
@@ -153,9 +182,10 @@ export default function VMDetailRoute() {
     return (
       <DashboardLayout>
         <div className="max-w-4xl mx-auto">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading VM...</p>
+          <div className="animate-pulse space-y-6 py-12">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+            <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+            <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
           </div>
         </div>
       </DashboardLayout>
@@ -167,14 +197,16 @@ export default function VMDetailRoute() {
       <DashboardLayout>
         <div className="max-w-4xl mx-auto">
           <div className="text-center py-12">
-            <p className="text-red-600 dark:text-red-400 text-lg font-medium">
+            <Shield className="h-16 w-16 mx-auto mb-4 text-red-600 dark:text-red-400" />
+            <p className="text-red-600 dark:text-red-400 text-lg font-medium mb-4">
               VM not found
             </p>
             <a
               href="/dashboard/-vms"
-              className="mt-4 inline-block text-primary hover:text-primary/80"
+              className="inline-flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
             >
-              ← Back to VMs
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to VMs
             </a>
           </div>
         </div>
@@ -186,55 +218,121 @@ export default function VMDetailRoute() {
     <DashboardLayout>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
           <div>
             <div className="flex items-center gap-3">
               <a
                 href="/dashboard/-vms"
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="inline-flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
               >
-                ← Back
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
               </a>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {vm.name}
               </h1>
             </div>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 ml-12">
-              {vm.os === "ubuntu-2204" ? "Ubuntu 22.04" : "Debian 12"} · {vm.tier}
+            <p className="text-gray-600 dark:text-gray-400 mt-2 ml-12 flex items-center gap-2">
+              <span className="flex items-center gap-1.5">
+                <Server className="h-4 w-4" />
+                {vm.os === "ubuntu-2204" ? "Ubuntu 22.04 LTS" : "Debian 12"}
+              </span>
+              <span className="text-gray-300 dark:text-gray-600">•</span>
+              <span className="capitalize">{vm.tier} tier</span>
             </p>
           </div>
-          <span
-            className={`px-3 py-1 inline-flex text-sm font-semibold rounded-full ${getStatusBadgeClass(
-              vm.status
-            )}`}
-          >
-            {vm.status.toUpperCase()}
-          </span>
+          <div className="flex items-center gap-3 flex-wrap">
+            {vm.is_pinned ? (
+              <>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-sm font-semibold">
+                  <Pin className="h-4 w-4 fill-current" />
+                  Pinned
+                </span>
+                <button
+                  onClick={handleUnpin}
+                  disabled={unpinMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                >
+                  <PinOff className="h-4 w-4" />
+                  {unpinMutation.isPending ? "..." : "Unpin"}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handlePin}
+                disabled={pinMutation.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                title="Pin VM to prevent auto-deletion"
+              >
+                <Pin className="h-4 w-4" />
+                {pinMutation.isPending ? "..." : "Pin VM"}
+              </button>
+            )}
+            <span
+              className={`inline-flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-full ${getStatusBadgeClass(
+                vm.status
+              )}`}
+            >
+              {vm.status === "running" && <Zap className="h-4 w-4" />}
+              {vm.status === "stopped" && <Square className="h-4 w-4" />}
+              {vm.status === "pending" && <Clock className="h-4 w-4" />}
+              {vm.status === "error" && <Shield className="h-4 w-4" />}
+              {vm.status.toUpperCase()}
+            </span>
+          </div>
         </div>
 
         {/* Main Content */}
         <div className="grid gap-6">
-          {/* Resource Usage Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          {/* Live Metrics Summary */}
+          {vm.status === "running" && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Live Resource Usage
+                </h2>
+                <a
+                  href={`/dashboard/observability?vm=${vm.id}`}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+                >
+                  View Full Metrics →
+                </a>
+              </div>
+              <MetricsSummary vmId={vm.id} timeRange="24h" />
+            </div>
+          )}
+
+          {/* Resource Allocation Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Cpu className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               Resource Allocation
             </h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">CPU</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Cpu className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">CPU</p>
+                </div>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
                   {vm.cpu} {vm.cpu === 1 ? "Core" : "Cores"}
                 </p>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">RAM</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <MemoryStick className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">RAM</p>
+                </div>
+                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
                   {formatBytes(vm.ram)}
                 </p>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Storage</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <HardDrive className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300">Storage</p>
+                </div>
+                <p className="text-2xl font-bold text-green-900 dark:text-green-100">
                   {formatBytes(vm.storage)}
                 </p>
               </div>
@@ -242,14 +340,15 @@ export default function VMDetailRoute() {
           </div>
 
           {/* Connection Info Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Globe className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
               Connection Information
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Domain</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Domain</p>
                   {getDomainStatusBadge()}
                 </div>
                 {vm.domain ? (
@@ -257,12 +356,10 @@ export default function VMDetailRoute() {
                     href={`https://${vm.domain}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-lg font-mono text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-2 mt-1"
+                    className="inline-flex items-center gap-2 text-lg font-mono text-blue-600 dark:text-blue-400 hover:underline transition-colors"
                   >
                     {vm.domain}
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
+                    <ExternalLink className="h-4 w-4" />
                   </a>
                 ) : (
                   <p className="text-lg font-mono text-gray-900 dark:text-white">
@@ -270,63 +367,72 @@ export default function VMDetailRoute() {
                   </p>
                 )}
                 {vm.domain_status === "pending" && (
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                    ⏳ DNS propagation in progress. This may take up to 5 minutes.
-                  </p>
+                  <div className="flex items-center gap-2 mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+                    <Clock className="h-4 w-4 animate-pulse" />
+                    <p>DNS propagation in progress. This may take up to 5 minutes.</p>
+                  </div>
                 )}
                 {vm.domain_status === "error" && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                    ⚠️ DNS setup failed. Please contact support.
-                  </p>
+                  <div className="flex items-center gap-2 mt-2 text-sm text-red-600 dark:text-red-400">
+                    <Shield className="h-4 w-4" />
+                    <p>DNS setup failed. Please contact support.</p>
+                  </div>
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">SSH Access</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded text-sm font-mono text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
+                  <Terminal className="h-4 w-4" />
+                  SSH Access
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <code className="flex-1 bg-gray-100 dark:bg-gray-700 px-4 py-3 rounded-xl text-sm font-mono text-gray-900 dark:text-white break-all">
                     ssh -i ~/.ssh/id_ed25519 user@{vm.domain || `${vm.name}.podland.app`}
                   </code>
                   <button
                     onClick={handleDownloadSSHKey}
-                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors"
-                    title="Download SSH Key"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 transition-all"
                   >
-                    📥 Download Key
+                    <Download className="h-4 w-4" />
+                    Download Key
                   </button>
                 </div>
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                  ⚠️ The SSH private key was shown only once during VM creation. If you didn't save it, you'll need to recreate the VM.
-                </p>
+                <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-xl">
+                  <Shield className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                    <strong>Important:</strong> The SSH private key was shown only once during VM creation. If you didn't save it, you'll need to recreate the VM.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Metadata Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Server className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               Metadata
             </h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">VM ID</p>
-                <p className="text-sm font-mono text-gray-900 dark:text-white">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">VM ID</p>
+                <p className="text-sm font-mono text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
                   {vm.id}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Created</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</p>
                 <p className="text-sm text-gray-900 dark:text-white">
                   {new Date(vm.created_at).toLocaleString()}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Tier</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Tier</p>
                 <p className="text-sm text-gray-900 dark:text-white capitalize">
                   {vm.tier}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Operating System</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Operating System</p>
                 <p className="text-sm text-gray-900 dark:text-white">
                   {vm.os === "ubuntu-2204" ? "Ubuntu 22.04 LTS" : "Debian 12"}
                 </p>
@@ -334,19 +440,41 @@ export default function VMDetailRoute() {
             </div>
           </div>
 
+          {/* Recent Logs */}
+          {vm.status === "running" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Terminal className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  Recent Logs
+                </h2>
+                <a
+                  href={`/dashboard/observability?vm=${vm.id}#logs`}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium inline-flex items-center gap-1"
+                >
+                  View All Logs
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+              <LogViewer vmId={vm.id} limit={100} showLiveTail={true} height="300px" />
+            </div>
+          )}
+
           {/* Actions Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Actions
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              VM Actions
             </h2>
             <div className="flex flex-wrap gap-3">
               {vm.status === "stopped" && (
                 <button
                   onClick={handleStart}
                   disabled={startMutation.isPending}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-lg font-medium transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-medium transition-all disabled:opacity-50 shadow-md hover:shadow-lg"
                 >
-                  {startMutation.isPending ? "Starting..." : "▶ Start VM"}
+                  <Play className="h-4 w-4" />
+                  {startMutation.isPending ? "Starting..." : "Start VM"}
                 </button>
               )}
               {vm.status === "running" && (
@@ -354,25 +482,28 @@ export default function VMDetailRoute() {
                   <button
                     onClick={handleStop}
                     disabled={stopMutation.isPending}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-800 text-white rounded-lg font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white rounded-xl font-medium transition-all disabled:opacity-50 shadow-md hover:shadow-lg"
                   >
-                    {stopMutation.isPending ? "Stopping..." : "⏹ Stop VM"}
+                    <Square className="h-4 w-4" />
+                    {stopMutation.isPending ? "Stopping..." : "Stop VM"}
                   </button>
                   <button
                     onClick={handleRestart}
                     disabled={restartMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium transition-all disabled:opacity-50 shadow-md hover:shadow-lg"
                   >
-                    {restartMutation.isPending ? "Restarting..." : "🔄 Restart VM"}
+                    <RotateCcw className="h-4 w-4" />
+                    {restartMutation.isPending ? "Restarting..." : "Restart VM"}
                   </button>
                 </>
               )}
               <button
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-lg font-medium transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all disabled:opacity-50 shadow-md hover:shadow-lg"
               >
-                {deleteMutation.isPending ? "Deleting..." : "🗑 Delete VM"}
+                <Trash2 className="h-4 w-4" />
+                {deleteMutation.isPending ? "Deleting..." : "Delete VM"}
               </button>
             </div>
           </div>
