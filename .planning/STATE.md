@@ -24,10 +24,10 @@
 
 ## Current Position
 
-**Phase:** Not started (defining requirements)
-**Plan:** —
-**Status:** Defining requirements
-**Last activity:** 2026-03-30 — Milestone v1.1 started
+**Phase:** Phase 6 (Security) — Ready to start
+**Plan:** 6 phases (6-11) for v1.1 Hardening & Polish
+**Status:** Roadmap defined, awaiting execution
+**Last activity:** 2026-03-30 — v1.1 roadmap created
 
 ---
 
@@ -104,9 +104,9 @@ None — All blockers resolved
 
 ## Next Steps
 
-1. **Define requirements** — Scope v1.1 features with REQ-IDs
-2. **Create roadmap** — Phase structure for implementation
-3. **Execute** — Run `/ez:plan-phase [N]` to start
+1. **Start Phase 6** — Run `/ez:discuss-phase 6` to gather context and plan Security phase
+2. **Execute Phase 6** — Implement rate limiting (4 requirements)
+3. **Continue through phases** — Phases 7-11 for full v1.1 scope
 
 ---
 
