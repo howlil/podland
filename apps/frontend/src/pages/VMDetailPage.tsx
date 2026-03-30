@@ -128,7 +128,7 @@ function VMDetailRoute() {
 
   const handleDownloadSSHKey = () => {
     toast.info("SSH key was shown only during VM creation", {
-      description: "You"ll need to recreate the VM if you didn"t save it."
+      description: "You'll need to recreate the VM if you didn't save it."
     });
   };
 
