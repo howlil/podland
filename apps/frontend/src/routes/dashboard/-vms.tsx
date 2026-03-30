@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CreateVMWizard } from "@/components/vm/CreateVMWizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/utils";
-import { POLLING_INTERVALS, VM_STATUS } from "@/lib/constants";
+import { POLLING_INTERVALS, VM_STATUS, UI } from "@/lib/constants";
 
 interface VM {
   id: string;
@@ -29,6 +29,18 @@ export default function VMsRoute() {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+
+  // Track tab visibility for polling optimization
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(document.visibilityState === "visible");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   const { data: vms = [], isLoading, error, refetch } = useQuery<VM[]>({
     queryKey: ["vms"],
@@ -36,7 +48,10 @@ export default function VMsRoute() {
       const { data } = await api.get("/vms");
       return data;
     },
-    refetchInterval: POLLING_INTERVALS.VM_STATUS,
+    // Only poll when tab is visible
+    refetchInterval: () => {
+      return isTabVisible ? POLLING_INTERVALS.VM_STATUS : false;
+    },
     retry: 2,
   });
 
@@ -149,6 +164,19 @@ export default function VMsRoute() {
     if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
     return 0;
   });
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredVms.length / UI.TABLE_PAGE_SIZE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const paginatedVms = filteredVms.slice(
+    (currentPageSafe - 1) * UI.TABLE_PAGE_SIZE,
+    currentPageSafe * UI.TABLE_PAGE_SIZE
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, sortField, sortOrder]);
 
   return (
     <DashboardLayout>
@@ -274,7 +302,7 @@ export default function VMsRoute() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
                 // Skeleton loading state
-                Array.from({ length: 5 }).map((_, idx) => (
+                Array.from({ length: UI.TABLE_PAGE_SIZE }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
                     <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
@@ -308,7 +336,7 @@ export default function VMsRoute() {
                   </td>
                 </tr>
               ) : (
-                filteredVms.map((vm) => (
+                paginatedVms.map((vm) => (
                   <tr key={vm.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <a
@@ -391,6 +419,64 @@ export default function VMsRoute() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing <span className="font-medium">{(currentPageSafe - 1) * UI.TABLE_PAGE_SIZE + 1}</span> to{" "}
+              <span className="font-medium">{Math.min(currentPageSafe * UI.TABLE_PAGE_SIZE, filteredVms.length)}</span> of{" "}
+              <span className="font-medium">{filteredVms.length}</span> VMs
+            </div>
+            <div className="flex items-center gap-2" role="navigation" aria-label="Pagination">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPageSafe === 1}
+                className="px-3 py-1 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[36px] min-w-[36px]"
+                aria-label="Previous page"
+              >
+                ← Prev
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPageSafe <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPageSafe >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPageSafe - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      aria-current={currentPageSafe === pageNum ? "page" : undefined}
+                      className={`px-3 py-1 text-sm font-medium rounded-md min-h-[36px] min-w-[36px] ${
+                        currentPageSafe === pageNum
+                          ? "bg-primary text-white"
+                          : "border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPageSafe === totalPages}
+                className="px-3 py-1 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[36px] min-w-[36px]"
+                aria-label="Next page"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create VM Wizard Modal */}
