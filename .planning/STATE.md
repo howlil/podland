@@ -88,7 +88,7 @@ None — All blockers resolved
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260330-001 | Fix frontend import issues (missing imports, path alias, unused imports) | 2026-03-30 | pending | [260330-001-frontend-import-fixes](./quick/260330-001-frontend-import-fixes/) |
+| 260330-001 | Fix frontend import issues (missing imports, path alias, unused imports) | 2026-03-30 | 432e2a0 | [260330-001-frontend-import-fixes](./quick/260330-001-frontend-import-fixes/) |
 
 ---
 
