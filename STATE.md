@@ -5,13 +5,31 @@
 ## Current Session
 
 **Date:** 2026-03-31
-**Task:** Phase 2 - Component Extraction (Frontend Refactor)
+**Task:** Phase 1 - Quick Wins (Frontend Refactor)
 **Mode:** Quick
 **Flags:** None (ad-hoc task)
 
 ---
 
 ## Quick Tasks Completed
+
+### Session 9: Phase 1 - Quick Wins (Utilities & DRY)
+| Task | Status | Commit | Notes |
+|------|--------|--------|-------|
+| Create vm-utils.ts | ✅ Done | TBD | getVMStatusStyles, canStartVM, canStopVM |
+| Add formatDate utility | ✅ Done | TBD | date/datetime/time formats |
+| Create errorHandler.ts | ✅ Done | TBD | getErrorMessage, getStatusErrorMessage |
+| Add REFRESH_INTERVALS | ✅ Done | TBD | All polling intervals documented |
+| Update VMHeader | ✅ Done | TBD | Uses getVMStatusStyles |
+| Update VMTable | ✅ Done | TBD | Uses utilities, cleaner logic |
+| Update VMsPage | ✅ Done | TBD | Uses all utilities |
+| Update UserTable | ✅ Done | TBD | Uses formatDate |
+| Update AdminAuditLogPage | ✅ Done | TBD | Uses formatDate + constants |
+| Update AdminHealthPage | ✅ Done | TBD | Uses REFRESH_INTERVALS |
+| Update useVMs hook | ✅ Done | TBD | Uses constants + errorHandler |
+| Update useObservability | ✅ Done | TBD | Uses REFRESH_INTERVALS |
+| Deprecate uiStore | ✅ Done | TBD | Added @deprecated comment |
+| TypeScript compilation | ✅ Done | TBD | 0 errors |
 
 ### Session 8: Phase 2 - Component Extraction
 | Task | Status | Commit | Notes |
