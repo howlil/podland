@@ -124,15 +124,55 @@ export function useVM(id: string) {
     },
   });
 
+  const restartMutation = useMutation({
+    mutationFn: () => api.post(`/vms/${id}/restart`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vm", id] });
+      queryClient.invalidateQueries({ queryKey: ["vms"] });
+      toast.success("VM restarted successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to restart VM: ${error.response?.data?.message || "Unknown error"}`);
+    },
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: () => api.post(`/vms/${id}/pin`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vm", id] });
+      toast.success("VM pinned successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to pin VM: ${error.response?.data?.message || "Unknown error"}`);
+    },
+  });
+
+  const unpinMutation = useMutation({
+    mutationFn: () => api.delete(`/vms/${id}/pin`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vm", id] });
+      toast.success("VM unpinned successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to unpin VM: ${error.response?.data?.message || "Unknown error"}`);
+    },
+  });
+
   return {
     vm,
     isLoading,
     error,
     startVM: () => startMutation.mutate(),
     stopVM: () => stopMutation.mutate(),
+    restartVM: () => restartMutation.mutate(),
     deleteVM: () => deleteMutation.mutate(),
+    pinVM: () => pinMutation.mutate(),
+    unpinVM: () => unpinMutation.mutate(),
     isStarting: startMutation.isPending,
     isStopping: stopMutation.isPending,
+    isRestarting: restartMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isPinning: pinMutation.isPending,
+    isUnpinning: unpinMutation.isPending,
   };
 }
