@@ -1,3 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,6 +8,10 @@ import { CreateVMWizard } from "@/components/vm/CreateVMWizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/utils";
 import { POLLING_INTERVALS, VM_STATUS, UI } from "@/lib/constants";
+
+export const Route = createFileRoute("/dashboard/vms/")({
+  component: VMsRoute,
+});
 
 interface VM {
   id: string;
@@ -24,7 +29,7 @@ interface VM {
 type SortField = "name" | "created_at" | "status";
 type SortOrder = "asc" | "desc";
 
-export default function VMsRoute() {
+function VMsRoute() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -64,7 +69,7 @@ export default function VMsRoute() {
       toast.success("VM started successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to start VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(`Failed to start VM: ${error.response?.data?.message || `Unknown error`}`);
     },
   });
 
@@ -75,7 +80,7 @@ export default function VMsRoute() {
       toast.success("VM stopped successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to stop VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(`Failed to stop VM: ${error.response?.data?.message || `Unknown error`}`);
     },
   });
 
@@ -86,7 +91,7 @@ export default function VMsRoute() {
       toast.success("VM restarted successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to restart VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(`Failed to restart VM: ${error.response?.data?.message || `Unknown error`}`);
     },
   });
 
@@ -97,27 +102,27 @@ export default function VMsRoute() {
       toast.success("VM deleted successfully");
     },
     onError: (error: any) => {
-      toast.error(`Failed to delete VM: ${error.response?.data?.message || "Unknown error"}`);
+      toast.error(`Failed to delete VM: ${error.response?.data?.message || `Unknown error`}`);
     },
   });
 
   const handleStart = (vmId: string) => {
-    toast.loading("Starting VM...", { id: `vm-${vmId}` });
+    toast.loading("Starting VM...", { id: "vm-${vmId}" });
     startMutation.mutate(vmId);
   };
 
   const handleStop = (vmId: string) => {
-    toast.loading("Stopping VM...", { id: `vm-${vmId}` });
+    toast.loading("Stopping VM...", { id: "vm-${vmId}" });
     stopMutation.mutate(vmId);
   };
 
   const handleRestart = (vmId: string) => {
-    toast.loading("Restarting VM...", { id: `vm-${vmId}` });
+    toast.loading("Restarting VM...", { id: "vm-${vmId}" });
     restartMutation.mutate(vmId);
   };
 
   const handleDelete = (vmId: string) => {
-    toast.loading("Deleting VM...", { id: `vm-${vmId}` });
+    toast.loading("Deleting VM...", { id: "vm-${vmId}" });
     deleteMutation.mutate(vmId);
   };
 
@@ -302,7 +307,7 @@ export default function VMsRoute() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
                 // Skeleton loading state
-                Array.from({ length: UI.TABLE_PAGE_SIZE }).map((_, idx) => (
+                (Array.from({ length: UI.TABLE_PAGE_SIZE }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
                     <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
@@ -312,7 +317,7 @@ export default function VMsRoute() {
                     <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
                     <td className="px-6 py-4"><Skeleton className="h-8 w-32 ml-auto" /></td>
                   </tr>
-                ))
+                )))
               ) : error ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center">
@@ -368,7 +373,7 @@ export default function VMsRoute() {
                       {new Date(vm.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2" role="group" aria-label={`Actions for ${vm.name}`}>
+                      <div className="flex items-center justify-end gap-2" role="group" aria-label={"Actions for ${vm.name}"}>
                         {vm.status === "stopped" && (
                           <button
                             onClick={() => handleStart(vm.id)}
@@ -478,7 +483,6 @@ export default function VMsRoute() {
           </div>
         )}
       </div>
-
       {/* Create VM Wizard Modal */}
       {isWizardOpen && (
         <CreateVMWizard
@@ -490,5 +494,5 @@ export default function VMsRoute() {
         />
       )}
     </DashboardLayout>
-  );
+  )
 }

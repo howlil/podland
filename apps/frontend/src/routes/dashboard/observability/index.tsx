@@ -1,9 +1,14 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { MetricsSummary } from "@/components/observability/MetricsSummary";
 import { LogViewer } from "@/components/observability/LogViewer";
 import { Activity, FileText, AlertTriangle, ExternalLink } from "lucide-react";
 
-export default function ObservabilityPage() {
+export const Route = createFileRoute("/dashboard/observability/")({
+  component: ObservabilityPage,
+});
+
+function ObservabilityPage() {
   // Note: vmId should be passed via query param: ?vm=xxx
   const params = new URLSearchParams(window.location.search);
   const vmId = params.get("vm") || undefined;
