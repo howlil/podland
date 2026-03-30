@@ -5,9 +5,9 @@
 ## Current Session
 
 **Date:** 2026-03-30  
-**Task:** Professional UI/UX Improvements  
-**Mode:** Quick  
-**Flags:** None
+**Task:** Frontend Deep Refactor Plan  
+**Mode:** Quick (with deep research)  
+**Flags:** --discuss (documented in plan)
 
 ---
 
@@ -27,70 +27,103 @@
 ### Session 2: Professional UI/UX Redesign
 | Task | Status | Commit | Notes |
 |------|--------|--------|-------|
-| Root page redesign | ✅ Done | Pending | Hero + features + stats |
-| VM detail visual hierarchy | ✅ Done | Pending | Better cards + icons |
-| Replace emoji with icons | ✅ Done | Pending | All Lucide React |
-| Gradient backgrounds | ✅ Done | Pending | Modern visual appeal |
-| Toast feedback | ✅ Done | Pending | Action loading states |
-| Improved cards | ✅ Done | Pending | Color-coded resources |
+| Root page redesign | ✅ Done | 60a26cd | Hero + features + stats |
+| VM detail visual hierarchy | ✅ Done | 60a26cd | Better cards + icons |
+| Replace emoji with icons | ✅ Done | 60a26cd | All Lucide React |
+| Gradient backgrounds | ✅ Done | 60a26cd | Modern visual appeal |
+
+### Session 3: TanStack Start Structure
+| Task | Status | Commit | Notes |
+|------|--------|--------|-------|
+| Route restructuring | ✅ Done | 6a9486c | Flat file-based routes |
+| main.tsx minimal | ✅ Done | 817e467 | Pure bootstrap (9 lines) |
+| router.tsx factory | ✅ Done | 817e467 | getRouter function |
+| __root.tsx providers | ✅ Done | 817e467 | All providers here |
+
+### Session 4: Architecture Foundation
+| Task | Status | Commit | Notes |
+|------|--------|--------|-------|
+| Custom hooks layer | ✅ Done | 4d83cbf | useVMs.ts |
+| Zustand stores | ✅ Done | 4d83cbf | uiStore.ts |
+| Reusable components | ✅ Done | 4d83cbf | VMTable, StatsCard |
+| Container pattern | 🟡 Partial | 5120952 | VMsPage refactored |
+
+### Session 5: Deep Refactor Plan
+| Task | Status | Commit | Notes |
+|------|--------|--------|-------|
+| Deep research | ✅ Done | Pending | Container/Presentational, state mgmt |
+| Refactor roadmap | ✅ Done | Pending | 3 phases, 22 hours estimated |
+| Success metrics | ✅ Done | Pending | Measurable targets |
 
 ---
 
-## UI/UX Improvements Summary
+## Deep Refactor Plan Summary
 
-### Root Page Transformation
-**Before:** Plain text list with basic info
-**After:** Modern landing page with:
-- ✨ Gradient hero section with animated badge
-- 📊 Live stats display (users, VMs, uptime, domains)
-- 🎨 4 feature cards with hover effects
-- 🚀 Dual CTA buttons with gradients
-- 📱 Fully responsive design
-- 🌙 Dark mode optimized
+**Research-Based Architecture:**
+After deep research on TanStack Router best practices, Container/Presentational pattern, and state management for PaaS dashboards:
 
-### VM Detail Page Enhancement
-**Before:** Basic cards with emoji icons
-**After:** Professional dashboard with:
-- 🎯 Status badges with icons (Zap, Square, Clock, Shield)
-- 📌 Pin/Unpin with Lucide icons
-- 💻 Resource cards with gradient backgrounds
-- 🌐 Domain status with animated indicators
-- 🔐 SSH access with copy-friendly code blocks
-- ⚡ Action buttons with gradient backgrounds
-- 📊 Live metrics integration
-- 📜 Log viewer with live tail
+### 📋 Refactor Roadmap
 
-### Visual Design System
-**Colors:**
-- Primary gradients: blue → purple → pink
-- Resource cards: blue (CPU), purple (RAM), green (Storage)
-- Action buttons: green (Start), yellow (Stop), blue (Restart), red (Delete)
+| Phase | Focus | Tasks | Est. Time | Status |
+|-------|-------|-------|-----------|--------|
+| **2A** | Core Pages | Dashboard, VMDetail, Observability, Admin | 8h | 📋 Planned |
+| **2B** | UI/UX Polish | Design system, a11y, loading states | 6h | 📋 Planned |
+| **2C** | Product Features | Onboarding, analytics, performance | 4h | 📋 Planned |
+| **Testing** | Quality | Unit + integration tests | 4h | 📋 Planned |
+| **Total** | | | **22 hours** | |
 
-**Icons:** All emoji replaced with Lucide React
-- Server, Globe, Shield, Zap, Terminal
-- Pin, PinOff, Play, Square, RotateCcw, Trash2
-- ArrowLeft, Clock, HardDrive, Cpu, MemoryStick
-- ExternalLink, Download, Rocket, Users
+### 🎯 Goals
 
-**Typography:**
-- Hero: 5xl-7xl responsive with gradient text
-- Headings: Semibold with icon prefixes
-- Better hierarchy with spacing
+**Architecture Excellence:**
+- 100% Container/Presentational Pattern
+- Zero direct API calls in pages
+- Complete state management (Server: Query, Client: Zustand)
 
-**Interactions:**
-- Hover scale transforms on CTAs
-- Shadow elevation on hover
-- Smooth transitions (300ms)
-- Loading states with toast feedback
+**UI/UX Excellence:**
+- Design system (Tailwind config)
+- WCAG 2.1 AA accessibility
+- Responsive design (mobile-first)
+- Loading/Error/Empty states
+
+**Product Engineering:**
+- User onboarding flow
+- Analytics integration
+- Performance optimization (<500KB bundle)
+
+### 📊 Success Metrics
+
+| Metric | Before | Target |
+|--------|--------|--------|
+| Pages with direct API calls | 7 | 0 |
+| Reusable components | 3 | 15+ |
+| Custom hooks | 1 | 8+ |
+| Lighthouse Accessibility | 85 | 95+ |
+| Lighthouse Performance | 75 | 90+ |
+| Bundle size | ~600KB | <500KB |
 
 ---
 
-## Files Modified
+## Files Created
 
-| File | Changes | Lines |
-|------|---------|-------|
-| `routes/__root.tsx` | Complete redesign | +180/-30 |
-| `routes/dashboard/-vms/$id.tsx` | Visual hierarchy + icons | +150/-80 |
+### Architecture Foundation
+- `apps/frontend/src/hooks/useVMs.ts`
+- `apps/frontend/src/stores/uiStore.ts`
+- `apps/frontend/src/components/vm/VMTable.tsx`
+- `apps/frontend/src/components/ui/StatsCard.tsx`
+
+### Planning
+- `.planning/quick/fe-gap-analysis.md`
+- `.planning/quick/ui-improvements.md`
+- `.planning/quick/frontend-refactor-plan.md`
+
+### Stack Additions
+```json
+{
+  "dependencies": {
+    "sonner": "^1.4.0"
+  }
+}
+```
 
 ---
 
@@ -106,9 +139,12 @@
 
 ## Next Actions
 
-**Optional Polish:**
-1. Add empty state illustrations
-2. Implement onboarding flow
-3. Add quota dashboard widget
-4. Create VM connection guide modal
-5. Add bulk actions for VMs
+**Recommended:** Execute Phase 2A (Core Pages Refactor)
+
+**Tasks:**
+1. Refactor DashboardPage (2h) - useDashboard hook + StatsGrid component
+2. Refactor VMDetailPage (2h) - useVM hook + VM components
+3. Refactor ObservabilityPage (2h) - useObservability hook + tab components
+4. Refactor Admin pages (2h) - useAdminUsers hook + UserTable component
+
+**Or:** Continue with current task flow (user's choice)
