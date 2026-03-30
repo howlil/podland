@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/utils";
 import { POLLING_INTERVALS, VM_STATUS, UI } from "@/lib/constants";
 
-export const Route = createFileRoute("/dashboard/vms/")({
+export const Route = createFileRoute("/dashboard-vms")({
   component: VMsRoute,
 });
 

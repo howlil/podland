@@ -5,7 +5,7 @@ import { Server, Zap, Globe, HardDrive, ArrowRight, Plus } from "lucide-react";
 import { CreateVMWizard } from "@/components/vm/CreateVMWizard";
 import { useState } from "react";
 
-export const Route = createFileRoute("/dashboard/")({
+export const Route = createFileRoute("/dashboard")({
   component: DashboardIndex,
 });
 

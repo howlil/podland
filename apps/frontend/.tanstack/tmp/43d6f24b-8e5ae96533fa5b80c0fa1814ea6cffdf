@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-export const Route = createFileRoute('/admin/users')({
+export const Route = createFileRoute('/admin-users')({
   component: AdminUsersPage,
 })
 
@@ -25,7 +25,7 @@ function AdminUsersPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin-users', roleFilter],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/users${roleFilter ? `?role=${roleFilter}` : ''}`)
+      const response = await fetch(`/api/admin/users${roleFilter ? `?role=${roleFilter}` : ``}`)
       if (!response.ok) throw new Error('Failed to fetch users')
       return response.json()
     },
@@ -124,7 +124,7 @@ function AdminUsersPage() {
                   <tr key={user.id} className="border-b">
                     <td className="px-6 py-4">{user.email}</td>
                     <td className="px-6 py-4">{user.display_name}</td>
-                    <td className="px-6 py-4">{user.nim || '-'}</td>
+                    <td className="px-6 py-4">{user.nim || "-"}</td>
                     <td className="px-6 py-4">
                       <Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge>
                     </td>

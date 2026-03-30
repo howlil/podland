@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-export const Route = createFileRoute('/admin/audit-log')({
+export const Route = createFileRoute('/admin-audit-log')({
   component: AuditLogPage,
 })
 

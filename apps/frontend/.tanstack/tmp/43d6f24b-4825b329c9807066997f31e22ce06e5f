@@ -1,3 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -25,7 +26,11 @@ interface VM {
   created_at: string;
 }
 
-export default function VMDetailRoute() {
+export const Route = createFileRoute("/dashboard-vms-$id")({
+  component: VMDetailRoute,
+});
+
+function VMDetailRoute() {
   // Get VM ID from URL path
   const pathSegments = window.location.pathname.split("/");
   const id = pathSegments[pathSegments.length - 1];
@@ -92,38 +97,38 @@ export default function VMDetailRoute() {
   });
 
   const handleStart = () => {
-    toast.loading("Starting VM...", { id: `vm-${id}` });
+    toast.loading("Starting VM...", { id: "vm-${id}" });
     startMutation.mutate();
   };
 
   const handleStop = () => {
-    toast.loading("Stopping VM...", { id: `vm-${id}` });
+    toast.loading("Stopping VM...", { id: "vm-${id}" });
     stopMutation.mutate();
   };
 
   const handleRestart = () => {
-    toast.loading("Restarting VM...", { id: `vm-${id}` });
+    toast.loading("Restarting VM...", { id: "vm-${id}" });
     restartMutation.mutate();
   };
 
   const handleDelete = () => {
-    toast.loading("Deleting VM...", { id: `vm-${id}` });
+    toast.loading("Deleting VM...", { id: "vm-${id}" });
     deleteMutation.mutate();
   };
 
   const handlePin = () => {
-    toast.loading(vm?.is_pinned ? "Unpinning VM..." : "Pinning VM...", { id: `vm-${id}-pin` });
+    toast.loading(vm?.is_pinned ? "Unpinning VM..." : "Pinning VM...", { id: "vm-${id}-pin" });
     pinMutation.mutate();
   };
 
   const handleUnpin = () => {
-    toast.loading("Unpinning VM...", { id: `vm-${id}-pin` });
+    toast.loading("Unpinning VM...", { id: "vm-${id}-pin" });
     unpinMutation.mutate();
   };
 
   const handleDownloadSSHKey = () => {
     toast.info("SSH key was shown only during VM creation", {
-      description: "You'll need to recreate the VM if you didn't save it."
+      description: "You"ll need to recreate the VM if you didn"t save it."
     });
   };
 
