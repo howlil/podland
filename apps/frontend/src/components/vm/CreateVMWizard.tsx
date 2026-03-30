@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -42,6 +42,63 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
   const [selectedOS] = useState("ubuntu-2204");
   const [createdVM, setCreatedVM] = useState<CreateVMResponse | null>(null);
   const [showSSHKey, setShowSSHKey] = useState(false);
+  
+  // Accessibility: Focus management
+  const stepContentRef = useRef<HTMLDivElement>(null);
+  const close_button_ref = useRef<HTMLButtonElement>(null);
+  
+  // Focus management: Move focus to step heading when step changes
+  useEffect(() => {
+    if (stepContentRef.current) {
+      const heading = stepContentRef.current.querySelector('h3');
+      if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus();
+      }
+    }
+  }, [step]);
+  
+  // Keyboard navigation: Close on Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+  
+  // Focus trap: Keep focus within modal
+  useEffect(() => {
+    const modal = stepContentRef.current?.closest('[role="dialog"]');
+    if (modal) {
+      const focusableElements = modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0] as HTMLElement;
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+      
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab') return;
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      };
+      
+      modal.addEventListener('keydown', handleTabKey);
+      return () => modal.removeEventListener('keydown', handleTabKey);
+    }
+  }, []);
 
   const { data: tiers = [] } = useQuery<Tier[]>({
     queryKey: ["tiers"],
@@ -161,8 +218,10 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
     return tier.min_role === "external" || user.role === "internal";
   };
 
+  const stepTitles = ["Name Your VM", "Choose a Tier", "Review & Create", "VM Created!"];
+  
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-6">
+    <div className="flex items-center justify-center mb-6" role="group" aria-label="Progress steps">
       {[1, 2, 3, 4].map((s) => (
         <div key={s} className="flex items-center">
           <div
@@ -171,6 +230,8 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
                 ? "bg-primary text-white"
                 : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
             }`}
+            aria-current={s === step ? "step" : undefined}
+            aria-label={`Step ${s}: ${stepTitles[s - 1]}`}
           >
             {s < 4 ? s : "✓"}
           </div>
@@ -179,6 +240,7 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
               className={`w-16 h-1 ${
                 s < step ? "bg-primary" : "bg-gray-200 dark:bg-gray-700"
               }`}
+              aria-hidden="true"
             />
           )}
         </div>
@@ -367,17 +429,34 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
+          {/* Screen reader announcement */}
+          <div 
+            role="status" 
+            aria-live="polite" 
+            aria-atomic="true"
+            className="sr-only"
+          >
+            Step {step} of 4: {stepTitles[step - 1]}
+          </div>
+          
           {/* Header */}
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white">
               Create New VM
             </h2>
             <button
+              ref={close_button_ref}
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              aria-label="Close create VM dialog"
             >
               ✕
             </button>
@@ -386,7 +465,7 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
           {renderStepIndicator()}
 
           {/* Step Content */}
-          <div className="py-4">
+          <div ref={stepContentRef} className="py-4">
             {step === 1 && renderStep1()}
             {step === 2 && renderStep2()}
             {step === 3 && renderStep3()}
