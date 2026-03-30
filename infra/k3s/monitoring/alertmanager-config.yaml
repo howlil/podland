@@ -1,0 +1,22 @@
+# Alertmanager Configuration Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-podland-config
+  namespace: monitoring
+type: Opaque
+stringData:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['vm_id', 'alertname']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'backend-webhook'
+    receivers:
+      - name: 'backend-webhook'
+        webhook_configs:
+          - url: 'http://podland-backend.podland.svc:8080/api/alerts/webhook'
+            send_resolved: true

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -22,16 +23,18 @@ import (
 type VMHandler struct {
 	vmUsecase  *usecase.VMUsecase
 	vmRepo     repository.VMRepository
+	userRepo   repository.UserRepository
 	dnsManager *cloudflare.DNSManager
 	dnsPoller  *domain.DNSPoller
 	authHelper *AuthHelper
 }
 
 // NewVMHandler creates a new VM handler with dependencies
-func NewVMHandler(vmUsecase *usecase.VMUsecase, vmRepo repository.VMRepository, dnsManager *cloudflare.DNSManager, dnsPoller *domain.DNSPoller) *VMHandler {
+func NewVMHandler(vmUsecase *usecase.VMUsecase, vmRepo repository.VMRepository, userRepo repository.UserRepository, dnsManager *cloudflare.DNSManager, dnsPoller *domain.DNSPoller) *VMHandler {
 	return &VMHandler{
 		vmUsecase:  vmUsecase,
 		vmRepo:     vmRepo,
+		userRepo:   userRepo,
 		dnsManager: dnsManager,
 		dnsPoller:  dnsPoller,
 		authHelper: NewAuthHelper(),
@@ -443,4 +446,76 @@ func sanitizeSubdomain(name string) string {
 // stringPtr returns a pointer to a string
 func stringPtr(s string) *string {
 	return &s
+}
+
+// HandlePinVM pins a VM to prevent auto-deletion
+// POST /api/vms/{id}/pin
+func (h *VMHandler) HandlePinVM(w http.ResponseWriter, r *http.Request) {
+	userID := h.authHelper.GetAuthUserID(r)
+	if userID == "" {
+		pkgresponse.Unauthorized(w, "Unauthorized")
+		return
+	}
+
+	vmID := chi.URLParam(r, "id")
+	if vmID == "" {
+		pkgresponse.BadRequest(w, "VM ID is required")
+		return
+	}
+
+	// Verify VM ownership
+	_, err := h.vmRepo.GetVMByIDAndUser(r.Context(), vmID, userID)
+	if err != nil {
+		pkgresponse.NotFound(w, "VM not found")
+		return
+	}
+
+	// Get user to check pin limit
+	user, err := h.userRepo.GetUserByID(r.Context(), userID)
+	if err != nil {
+		pkgresponse.InternalError(w, "Failed to get user")
+		return
+	}
+
+	// Check pin limit based on role
+	limit := 1
+	if user.Role == "internal" {
+		limit = 3
+	}
+
+	pinnedCount := h.vmRepo.GetPinnedCount(r.Context(), userID)
+	if pinnedCount >= limit {
+		pkgresponse.BadRequest(w, fmt.Sprintf("Pin limit exceeded (max %d for your role)", limit))
+		return
+	}
+
+	if err := h.vmRepo.SetPinned(r.Context(), vmID, true); err != nil {
+		pkgresponse.InternalError(w, "Failed to pin VM")
+		return
+	}
+
+	pkgresponse.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// HandleUnpinVM unpins a VM
+// DELETE /api/vms/{id}/pin
+func (h *VMHandler) HandleUnpinVM(w http.ResponseWriter, r *http.Request) {
+	userID := h.authHelper.GetAuthUserID(r)
+	if userID == "" {
+		pkgresponse.Unauthorized(w, "Unauthorized")
+		return
+	}
+
+	vmID := chi.URLParam(r, "id")
+	if vmID == "" {
+		pkgresponse.BadRequest(w, "VM ID is required")
+		return
+	}
+
+	if err := h.vmRepo.SetPinned(r.Context(), vmID, false); err != nil {
+		pkgresponse.InternalError(w, "Failed to unpin VM")
+		return
+	}
+
+	pkgresponse.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

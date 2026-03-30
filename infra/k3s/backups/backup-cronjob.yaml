@@ -1,0 +1,112 @@
+# Kubernetes CronJob for automated PostgreSQL backups
+# Deploys to podland namespace
+# Runs daily at 3 AM UTC
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pg-backup
+  namespace: podland
+  labels:
+    app: podland
+    component: backup
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM UTC
+  concurrencyPolicy: Forbid  # Don't run if previous job still running
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:15
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting backup at $(date)"
+              
+              # Install dependencies
+              apk add --no-cache aws-cli gzip
+              
+              # Create backup
+              pg_dump "postgresql://${DB_USER}@${DB_HOST}/${DB_NAME}" | gzip > /backups/podland-$(date +%Y%m%d-%H%M%S).sql.gz
+              
+              # Upload to S3 if configured
+              if [ -n "${S3_BUCKET}" ]; then
+                aws s3 cp /backups/ ${S3_BUCKET}/ --recursive
+              fi
+              
+              # Clean up old backups
+              find /backups -name "podland-*.sql.gz" -mtime +${RETENTION_DAYS} -delete
+              
+              echo "Backup completed at $(date)"
+            env:
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_USER
+              value: "podland"
+            - name: DB_NAME
+              value: "podland"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: podland-secrets
+                  key: database-password
+            - name: S3_BUCKET
+              value: "s3://podland-backups"
+            - name: RETENTION_DAYS
+              value: "7"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: podland-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: podland-secrets
+                  key: aws-secret-access-key
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+          serviceAccountName: podland-backup-sa
+
+---
+# PersistentVolumeClaim for backup storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+  namespace: podland
+  labels:
+    app: podland
+    component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+
+---
+# ServiceAccount for backup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: podland-backup-sa
+  namespace: podland
+  labels:
+    app: podland
+    component: backup

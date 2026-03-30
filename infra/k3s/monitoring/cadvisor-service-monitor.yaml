@@ -1,0 +1,32 @@
+# ServiceMonitor for cAdvisor metrics
+# Scrapes container metrics every 30 seconds
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cadvisor
+  namespace: kube-system
+  labels:
+    app: cadvisor
+spec:
+  jobLabel: k8s-app
+  selector:
+    matchLabels:
+      k8s-app: cadvisor
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    tlsConfig:
+      insecureSkipVerify: true
+    interval: 30s
+    honorLabels: true
+    relabelings:
+    # Map pod labels to vm_id
+    - sourceLabels: [__meta_kubernetes_pod_label_vm_id]
+      targetLabel: vm_id
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod_name
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace

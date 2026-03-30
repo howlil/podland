@@ -47,7 +47,9 @@ type Alert struct {
 func NewAlertWebhookHandler(vmRepo repository.VMRepository, notificationRepo repository.NotificationRepository) *AlertWebhookHandler {
 	serviceToken := os.Getenv("ALERTMANAGER_WEBHOOK_SECRET")
 	if serviceToken == "" {
-		log.Fatal("ALERTMANAGER_WEBHOOK_SECRET environment variable is required")
+		// Alertmanager is optional - return nil handler if not configured
+		log.Println("ALERTMANAGER_WEBHOOK_SECRET not configured. Alert webhook disabled.")
+		return nil
 	}
 
 	return &AlertWebhookHandler{

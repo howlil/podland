@@ -15,6 +15,8 @@ type VM struct {
 	Status       string
 	Domain       *string
 	SSHPublicKey *string
+	IsPinned     bool
+	IdleWarnedAt *time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	StartedAt    *time.Time

@@ -3,13 +3,24 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 )
 
 func Load() error {
-	// Load .env file (optional in production)
-	_ = godotenv.Load()
+	// Get the directory where the binary is running
+	execDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Try to load .env file from current directory
+	envPath := filepath.Join(execDir, ".env")
+	if loadErr := godotenv.Load(envPath); loadErr != nil {
+		// .env file is optional, but log if not found
+		fmt.Printf("Note: .env file not loaded: %v\n", loadErr)
+	}
 
 	// Validate required environment variables
 	required := []string{

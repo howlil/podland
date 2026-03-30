@@ -56,6 +56,10 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Debug: print loaded env vars
+	log.Printf("DEBUG: GITHUB_CLIENT_ID='%s'", os.Getenv("GITHUB_CLIENT_ID"))
+	log.Printf("DEBUG: GITHUB_CLIENT_SECRET='%s'", os.Getenv("GITHUB_CLIENT_SECRET"))
+
 	// Validate required environment variables
 	checkRequiredEnvVars()
 
@@ -204,7 +208,10 @@ func main() {
 
 	// Observability routes
 	// Alert webhook (internal service only - no auth, uses service token)
-	r.Post("/api/alerts/webhook", alertWebhookHandler.HandleAlert)
+	// Only register if alertmanager is configured
+	if alertWebhookHandler != nil {
+		r.Post("/api/alerts/webhook", alertWebhookHandler.HandleAlert)
+	}
 
 	// Metrics, logs, and notifications routes (protected)
 	// These are nested under /api/vms/{id} for specific VM operations
@@ -220,7 +227,10 @@ func main() {
 		r.Get("/metrics/detail", metricsHandler.RedirectToGrafana)
 		r.Get("/logs", logsHandler.GetVMLogs)
 		r.Get("/logs/stream", logsHandler.StreamVMLogs)
-		r.Get("/alerts", alertWebhookHandler.GetVMAlerts)
+		// Only register alerts route if alertmanager is configured
+		if alertWebhookHandler != nil {
+			r.Get("/alerts", alertWebhookHandler.GetVMAlerts)
+		}
 	})
 
 	// Notifications routes (protected)

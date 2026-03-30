@@ -13,12 +13,16 @@ import (
 
 // MockVMRepository is a mock implementation of VMRepository
 type MockVMRepository struct {
-	CreateVMFn        func(ctx context.Context, input repository.VMCreateInput) (*entity.VM, error)
-	GetVMByIDFn       func(ctx context.Context, id string) (*entity.VM, error)
+	CreateVMFn         func(ctx context.Context, input repository.VMCreateInput) (*entity.VM, error)
+	GetVMByIDFn        func(ctx context.Context, id string) (*entity.VM, error)
 	GetVMByIDAndUserFn func(ctx context.Context, id, userID string) (*entity.VM, error)
-	GetUserVMsFn      func(ctx context.Context, userID string) ([]*entity.VM, error)
-	UpdateVMStatusFn  func(ctx context.Context, id, status string) error
-	DeleteVMFn        func(ctx context.Context, id string) error
+	GetUserVMsFn       func(ctx context.Context, userID string) ([]*entity.VM, error)
+	UpdateVMStatusFn   func(ctx context.Context, id, status string) error
+	DeleteVMFn         func(ctx context.Context, id string) error
+	SetPinnedFn        func(ctx context.Context, id string, pinned bool) error
+	GetPinnedCountFn   func(ctx context.Context, userID string) int
+	GetIdleVMsFn       func(ctx context.Context, hours int) ([]*entity.VM, error)
+	SetIdleWarnedAtFn  func(ctx context.Context, id string, warnedAt time.Time) error
 }
 
 func (m *MockVMRepository) CreateVM(ctx context.Context, input repository.VMCreateInput) (*entity.VM, error) {
@@ -65,6 +69,34 @@ func (m *MockVMRepository) DeleteVM(ctx context.Context, id string) error {
 		return m.DeleteVMFn(ctx, id)
 	}
 	return errors.New("DeleteVM not implemented")
+}
+
+func (m *MockVMRepository) SetPinned(ctx context.Context, id string, pinned bool) error {
+	if m.SetPinnedFn != nil {
+		return m.SetPinnedFn(ctx, id, pinned)
+	}
+	return nil
+}
+
+func (m *MockVMRepository) GetPinnedCount(ctx context.Context, userID string) int {
+	if m.GetPinnedCountFn != nil {
+		return m.GetPinnedCountFn(ctx, userID)
+	}
+	return 0
+}
+
+func (m *MockVMRepository) GetIdleVMs(ctx context.Context, hours int) ([]*entity.VM, error) {
+	if m.GetIdleVMsFn != nil {
+		return m.GetIdleVMsFn(ctx, hours)
+	}
+	return nil, nil
+}
+
+func (m *MockVMRepository) SetIdleWarnedAt(ctx context.Context, id string, warnedAt time.Time) error {
+	if m.SetIdleWarnedAtFn != nil {
+		return m.SetIdleWarnedAtFn(ctx, id, warnedAt)
+	}
+	return nil
 }
 
 // MockQuotaRepository is a mock implementation of QuotaRepository
@@ -151,12 +183,32 @@ func (m *MockUserRepository) UpdateUserNIM(ctx context.Context, userID, nim stri
 	return errors.New("UpdateUserNIM not implemented")
 }
 
+func (m *MockUserRepository) BanUser(ctx context.Context, userID string) error {
+	return nil
+}
+
+func (m *MockUserRepository) UnbanUser(ctx context.Context, userID string) error {
+	return nil
+}
+
+func (m *MockUserRepository) GetAllUsers(ctx context.Context) ([]*entity.User, error) {
+	return nil, nil
+}
+
+func (m *MockUserRepository) GetUsersByRole(ctx context.Context, role string) ([]*entity.User, error) {
+	return nil, nil
+}
+
+func (m *MockUserRepository) UpdateUserRole(ctx context.Context, userID, role string) error {
+	return nil
+}
+
 func (m *MockUserRepository) CreateActivityLog(ctx context.Context, userID string, action string, metadata map[string]interface{}) error {
 	return nil // No-op for tests
 }
 
 func (m *MockUserRepository) GetUserActivity(ctx context.Context, userID string, limit int) ([]repository.ActivityLog, error) {
-	return nil, errors.New("GetUserActivity not implemented")
+	return nil, nil
 }
 
 // TestVMUsecase_CreateVM_Success tests the success case of creating a VM

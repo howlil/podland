@@ -1,0 +1,159 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  REGISTRY: docker.io
+  BACKEND_IMAGE: podland/backend
+  FRONTEND_IMAGE: podland/frontend
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+          cache-dependency-path: apps/backend/go.sum
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache-dependency-path: apps/frontend/package-lock.json
+          cache: 'npm'
+      
+      - name: Test Backend
+        run: |
+          cd apps/backend
+          go test ./...
+      
+      - name: Build Backend
+        run: |
+          cd apps/backend
+          go build -o bin/podland ./cmd
+      
+      - name: Build Frontend
+        run: |
+          cd apps/frontend
+          npm ci
+          npm run build
+      
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-binary
+          path: apps/backend/bin/podland
+      
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: apps/frontend/dist
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:buildcache
+          cache-to: type=inline
+      
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:buildcache
+          cache-to: type=inline
+      
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_SERVER_HOST }}
+          username: ${{ secrets.PROD_SERVER_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            
+            echo "Pulling latest images..."
+            docker pull ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+            
+            echo "Updating Kubernetes deployments..."
+            kubectl set image deployment/podland-backend backend=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+            kubectl set image deployment/podland-frontend frontend=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+            
+            echo "Waiting for rollout..."
+            kubectl rollout status deployment/podland-backend --timeout=300s
+            kubectl rollout status deployment/podland-frontend --timeout=300s
+            
+            echo "Running database migrations..."
+            kubectl exec deployment/podland-backend -- ./podland migrate
+            
+            echo "Cleaning up old images..."
+            docker image prune -f --filter "until=24h"
+      
+      - name: Health Check
+        run: |
+          echo "Waiting for deployment to be ready..."
+          sleep 30
+          
+          HEALTH_URL="https://${{ secrets.PROD_SERVER_HOST }}/api/health"
+          echo "Checking health: $HEALTH_URL"
+          
+          for i in {1..10}; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
+            if [ "$RESPONSE" = "200" ]; then
+              echo "✓ Health check passed (HTTP $RESPONSE)"
+              exit 0
+            fi
+            echo "Attempt $i: Health check failed (HTTP $RESPONSE), retrying in 10s..."
+            sleep 10
+          done
+          
+          echo "✗ Health check failed after 10 attempts"
+          exit 1
+      
+      - name: Notify Success (Optional)
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          echo "Backend: https://${{ secrets.PROD_SERVER_HOST }}/api/health"
+          echo "Frontend: https://${{ secrets.PROD_SERVER_HOST }}"
+      
+      - name: Notify Failure (Optional)
+        if: failure()
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Check logs at: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

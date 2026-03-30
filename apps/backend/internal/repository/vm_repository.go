@@ -19,6 +19,12 @@ type VMRepository interface {
 	UpdateVMStatus(ctx context.Context, id, status string) error
 	UpdateVM(ctx context.Context, id string, input VMUpdateInput) error
 	DeleteVM(ctx context.Context, id string) error
+	// Pin methods
+	SetPinned(ctx context.Context, id string, pinned bool) error
+	GetPinnedCount(ctx context.Context, userID string) int
+	GetIdleVMs(ctx context.Context, hours int) ([]*entity.VM, error)
+	// Idle warning methods
+	SetIdleWarnedAt(ctx context.Context, id string, warnedAt time.Time) error
 }
 
 // vmRepository implements VMRepository
@@ -75,7 +81,7 @@ func (r *vmRepository) CreateVM(ctx context.Context, input VMCreateInput) (*enti
 // GetVMByID gets a VM by ID
 func (r *vmRepository) GetVMByID(ctx context.Context, id string) (*entity.VM, error) {
 	query := `
-		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, is_pinned, idle_warned_at, created_at, updated_at, started_at, stopped_at, deleted_at
 		FROM vms
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -93,6 +99,8 @@ func (r *vmRepository) GetVMByID(ctx context.Context, id string) (*entity.VM, er
 		&vm.Status,
 		&vm.Domain,
 		&vm.SSHPublicKey,
+		&vm.IsPinned,
+		&vm.IdleWarnedAt,
 		&vm.CreatedAt,
 		&vm.UpdatedAt,
 		&vm.StartedAt,
@@ -113,7 +121,7 @@ func (r *vmRepository) GetVMByID(ctx context.Context, id string) (*entity.VM, er
 // GetVMByIDAndUser gets a VM by ID and user ID (ownership check)
 func (r *vmRepository) GetVMByIDAndUser(ctx context.Context, id, userID string) (*entity.VM, error) {
 	query := `
-		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, is_pinned, idle_warned_at, created_at, updated_at, started_at, stopped_at, deleted_at
 		FROM vms
 		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 	`
@@ -131,6 +139,8 @@ func (r *vmRepository) GetVMByIDAndUser(ctx context.Context, id, userID string) 
 		&vm.Status,
 		&vm.Domain,
 		&vm.SSHPublicKey,
+		&vm.IsPinned,
+		&vm.IdleWarnedAt,
 		&vm.CreatedAt,
 		&vm.UpdatedAt,
 		&vm.StartedAt,
@@ -151,7 +161,7 @@ func (r *vmRepository) GetVMByIDAndUser(ctx context.Context, id, userID string) 
 // GetUserVMs gets all VMs for a user
 func (r *vmRepository) GetUserVMs(ctx context.Context, userID string) ([]*entity.VM, error) {
 	query := `
-		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, is_pinned, idle_warned_at, created_at, updated_at, started_at, stopped_at, deleted_at
 		FROM vms
 		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -178,6 +188,8 @@ func (r *vmRepository) GetUserVMs(ctx context.Context, userID string) ([]*entity
 			&vm.Status,
 			&vm.Domain,
 			&vm.SSHPublicKey,
+			&vm.IsPinned,
+			&vm.IdleWarnedAt,
 			&vm.CreatedAt,
 			&vm.UpdatedAt,
 			&vm.StartedAt,
@@ -277,4 +289,95 @@ func (r *vmRepository) DeleteVM(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// SetPinned sets the pinned status of a VM
+func (r *vmRepository) SetPinned(ctx context.Context, id string, pinned bool) error {
+	query := `
+		UPDATE vms
+		SET is_pinned = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, pinned, id)
+	return err
+}
+
+// GetPinnedCount gets the count of pinned VMs for a user
+func (r *vmRepository) GetPinnedCount(ctx context.Context, userID string) int {
+	query := `
+		SELECT COUNT(*)
+		FROM vms
+		WHERE user_id = $1 AND is_pinned = true AND deleted_at IS NULL
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
+	if err != nil {
+		return 0
+	}
+	return count
+}
+
+// GetIdleVMs gets VMs that have been idle (no status updates) for the specified hours
+func (r *vmRepository) GetIdleVMs(ctx context.Context, hours int) ([]*entity.VM, error) {
+	query := `
+		SELECT id, user_id, name, os, tier, cpu, ram, storage, status, domain, ssh_public_key, created_at, updated_at, started_at, stopped_at, deleted_at
+		FROM vms
+		WHERE deleted_at IS NULL
+		AND updated_at < NOW() - INTERVAL '1 hour' * $1
+		AND is_pinned = false
+		ORDER BY updated_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, hours)
+	if err != nil {
+		return nil, fmt.Errorf("get idle VMs: %w", err)
+	}
+	defer rows.Close()
+
+	var vms []*entity.VM
+	for rows.Next() {
+		vm := &entity.VM{}
+		err := rows.Scan(
+			&vm.ID,
+			&vm.UserID,
+			&vm.Name,
+			&vm.OS,
+			&vm.Tier,
+			&vm.CPU,
+			&vm.RAM,
+			&vm.Storage,
+			&vm.Status,
+			&vm.Domain,
+			&vm.SSHPublicKey,
+			&vm.CreatedAt,
+			&vm.UpdatedAt,
+			&vm.StartedAt,
+			&vm.StoppedAt,
+			&vm.DeletedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan VM: %w", err)
+		}
+		vms = append(vms, vm)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate VMs: %w", err)
+	}
+
+	return vms, nil
+}
+
+// SetIdleWarnedAt sets the idle_warned_at timestamp for a VM
+func (r *vmRepository) SetIdleWarnedAt(ctx context.Context, id string, warnedAt time.Time) error {
+	query := `
+		UPDATE vms
+		SET idle_warned_at = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, warnedAt, id)
+	return err
 }

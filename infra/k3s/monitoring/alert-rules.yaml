@@ -1,0 +1,44 @@
+# Prometheus Alert Rules for VM monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vm-alerts
+  namespace: monitoring
+  labels:
+    prometheus: podland
+    app: alertmanager
+spec:
+  groups:
+  - name: vm-alerts
+    interval: 30s
+    rules:
+    - alert: VMHighCPU
+      expr: |
+        (
+          rate(container_cpu_usage_seconds_total{vm_id!="", image!=""}[5m])
+          /
+          container_spec_cpu_quota{vm_id!="", image!=""}
+          *
+          container_spec_cpu_period{vm_id!="", image!=""}
+        ) > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        alert_type: cpu
+      annotations:
+        summary: "VM {{ $labels.vm_id }} has high CPU usage"
+        description: "CPU usage is above 90% for 5 minutes (current: {{ $value | mul 100 | printf \"%.0f\" }}%)"
+    - alert: VMHighMemory
+      expr: |
+        (
+          container_memory_usage_bytes{vm_id!="", image!=""}
+          /
+          container_spec_memory_limit_bytes{vm_id!="", image!=""}
+        ) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        alert_type: memory
+      annotations:
+        summary: "VM {{ $labels.vm_id }} has high memory usage"
+        description: "Memory usage is above 85% (current: {{ $value | mul 100 | printf \"%.0f\" }}%)"

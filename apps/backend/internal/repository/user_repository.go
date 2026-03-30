@@ -20,6 +20,12 @@ type UserRepository interface {
 	UpdateUserNIM(ctx context.Context, userID, nim string) error
 	CreateActivityLog(ctx context.Context, userID string, action string, metadata map[string]interface{}) error
 	GetUserActivity(ctx context.Context, userID string, limit int) ([]ActivityLog, error)
+	// Admin methods
+	GetAllUsers(ctx context.Context) ([]*entity.User, error)
+	GetUsersByRole(ctx context.Context, role string) ([]*entity.User, error)
+	UpdateUserRole(ctx context.Context, userID, role string) error
+	BanUser(ctx context.Context, userID string) error
+	UnbanUser(ctx context.Context, userID string) error
 }
 
 // userRepository implements UserRepository
@@ -248,4 +254,124 @@ func (r *userRepository) GetUserActivity(ctx context.Context, userID string, lim
 	}
 
 	return logs, nil
+}
+
+// GetAllUsers gets all users
+func (r *userRepository) GetAllUsers(ctx context.Context) ([]*entity.User, error) {
+	query := `
+		SELECT id, github_id, email, display_name, avatar_url, nim, role, created_at, updated_at
+		FROM users
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("get all users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*entity.User
+	for rows.Next() {
+		user := &entity.User{}
+		err := rows.Scan(
+			&user.ID,
+			&user.GithubID,
+			&user.Email,
+			&user.DisplayName,
+			&user.AvatarURL,
+			&user.NIM,
+			&user.Role,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate users: %w", err)
+	}
+
+	return users, nil
+}
+
+// GetUsersByRole gets users by role
+func (r *userRepository) GetUsersByRole(ctx context.Context, role string) ([]*entity.User, error) {
+	query := `
+		SELECT id, github_id, email, display_name, avatar_url, nim, role, created_at, updated_at
+		FROM users
+		WHERE role = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, role)
+	if err != nil {
+		return nil, fmt.Errorf("get users by role: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*entity.User
+	for rows.Next() {
+		user := &entity.User{}
+		err := rows.Scan(
+			&user.ID,
+			&user.GithubID,
+			&user.Email,
+			&user.DisplayName,
+			&user.AvatarURL,
+			&user.NIM,
+			&user.Role,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate users: %w", err)
+	}
+
+	return users, nil
+}
+
+// UpdateUserRole updates a user's role
+func (r *userRepository) UpdateUserRole(ctx context.Context, userID, role string) error {
+	query := `
+		UPDATE users
+		SET role = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, role, userID)
+	return err
+}
+
+// BanUser bans a user (sets a special 'banned' status)
+// Note: We use a 'banned' role to indicate banned status
+func (r *userRepository) BanUser(ctx context.Context, userID string) error {
+	query := `
+		UPDATE users
+		SET role = 'banned', updated_at = NOW()
+		WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
+}
+
+// UnbanUser unbans a user (restores to 'external' role)
+func (r *userRepository) UnbanUser(ctx context.Context, userID string) error {
+	query := `
+		UPDATE users
+		SET role = 'external', updated_at = NOW()
+		WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
 }

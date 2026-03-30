@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -37,9 +38,12 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	// Generate state token for CSRF protection
 	state, err := auth.GenerateStateToken()
 	if err != nil {
+		log.Printf("ERROR: Failed to generate state token: %v", err)
 		pkgresponse.InternalError(w, "Failed to generate state token")
 		return
 	}
+
+	log.Printf("DEBUG: Generated state: %s", state)
 
 	// Set state cookie (5 min expiry, HTTP-only)
 	http.SetCookie(w, &http.Cookie{
@@ -48,12 +52,15 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/api/auth",
 		HttpOnly: true,
 		Secure:   os.Getenv("ENV") == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode, // Changed from Strict to Lax for OAuth flow
 		MaxAge:   300, // 5 minutes
 	})
 
+	log.Printf("DEBUG: Set oauth_state cookie")
+
 	// Generate OAuth URL and redirect
 	url := auth.GetLoginURL(state)
+	log.Printf("DEBUG: Redirecting to: %s", url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
@@ -64,7 +71,23 @@ func (h *AuthHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	// Validate state parameter
 	state := r.FormValue("state")
 	oauthStateCookie, err := r.Cookie("oauth_state")
+	
+	log.Printf("DEBUG: Callback received - state from GitHub: %s", state)
+	if err != nil {
+		log.Printf("DEBUG: Cookie error: %v", err)
+	} else {
+		log.Printf("DEBUG: Cookie value: %s", oauthStateCookie.Value)
+	}
+	
 	if err != nil || state != oauthStateCookie.Value {
+		log.Printf("ERROR: State mismatch - cookie: %s, param: %s", 
+			func() string { 
+				if oauthStateCookie != nil { 
+					return oauthStateCookie.Value 
+				} 
+				return "<nil>" 
+			}(), 
+			state)
 		pkgresponse.BadRequest(w, "Invalid state parameter")
 		return
 	}

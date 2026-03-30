@@ -8,33 +8,45 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 )
 
-var OAuthConfig = &oauth2.Config{
-	ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
-	ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
-	Scopes:       []string{"user:email", "read:user"},
-	Endpoint:     github.Endpoint,
-	RedirectURL:  os.Getenv("GITHUB_CALLBACK_URL"),
+var (
+	oauthConfigOnce sync.Once
+	oauthConfig     *oauth2.Config
+)
+
+// getOAuthConfig lazily initializes and returns the OAuth config
+func getOAuthConfig() *oauth2.Config {
+	oauthConfigOnce.Do(func() {
+		oauthConfig = &oauth2.Config{
+			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+			Scopes:       []string{"user:email", "read:user"},
+			Endpoint:     github.Endpoint,
+			RedirectURL:  os.Getenv("GITHUB_CALLBACK_URL"),
+		}
+	})
+	return oauthConfig
 }
 
 // GetLoginURL generates the OAuth authorization URL
 func GetLoginURL(state string) string {
-	return OAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	return getOAuthConfig().AuthCodeURL(state, oauth2.AccessTypeOffline)
 }
 
 // ExchangeToken exchanges the authorization code for an access token
 func ExchangeToken(ctx context.Context, code string) (*oauth2.Token, error) {
-	return OAuthConfig.Exchange(ctx, code)
+	return getOAuthConfig().Exchange(ctx, code)
 }
 
 // GetHTTPClient creates an HTTP client with the OAuth token
 func GetHTTPClient(ctx context.Context, token *oauth2.Token) *http.Client {
-	return OAuthConfig.Client(ctx, token)
+	return getOAuthConfig().Client(ctx, token)
 }
 
 // GitHubUser represents a GitHub user response
