@@ -110,4 +110,4 @@ None — All blockers resolved
 
 ---
 
-*State updated: 2026-03-30 after v1.1 milestone started*
+*State updated: 2026-03-30 after v1.1 roadmap complete*
