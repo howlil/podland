@@ -1,5 +1,5 @@
 import { VM } from "@/hooks/useVMs";
-import { Globe, Terminal, Download, Clock, Shield, ExternalLink } from "lucide-react";
+import { Globe, Terminal, Download, Shield, ExternalLink } from "lucide-react";
 
 interface ConnectionInfoProps {
   vm?: VM;

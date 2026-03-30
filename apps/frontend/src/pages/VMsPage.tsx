@@ -1,23 +1,20 @@
 // TODO: Refactor to use useVMs hook and VMTable component
 // For now, keeping existing implementation to maintain functionality
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CreateVMWizard } from "@/components/vm/CreateVMWizard";
-import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/utils";
-import { POLLING_INTERVALS, VM_STATUS, UI } from "@/lib/constants";
+import { POLLING_INTERVALS, UI } from "@/lib/constants";
 
 export default function VMsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<string>("created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: vms = [], isLoading, error, refetch } = useQuery<any[]>({
+  const { data: vms = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ["vms"],
     queryFn: async () => {
       const { data } = await api.get("/vms");
@@ -62,22 +59,10 @@ export default function VMsPage() {
     },
   });
 
-  // Filter and sort
+  // Filter
   let filteredVms = vms.filter((vm) => {
     if (statusFilter === "all") return true;
     return vm.status === statusFilter;
-  });
-
-  filteredVms.sort((a, b) => {
-    let aVal = a[sortField];
-    let bVal = b[sortField];
-    if (sortField === "created_at") {
-      aVal = new Date(a.created_at).getTime();
-      bVal = new Date(b.created_at).getTime();
-    }
-    if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-    return 0;
   });
 
   // Pagination

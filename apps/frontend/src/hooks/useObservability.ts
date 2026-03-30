@@ -5,12 +5,6 @@ import api from "@/lib/api";
 type ActiveTab = "metrics" | "logs" | "alerts";
 type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d";
 
-interface ObservabilityData {
-  metrics?: any;
-  logs?: any;
-  alerts?: any;
-}
-
 export function useObservability(vmId: string) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("metrics");
   const [timeRange, setTimeRange] = useState<TimeRange>("24h");

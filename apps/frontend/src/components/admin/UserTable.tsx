@@ -20,8 +20,8 @@ export function UserTable({ users, isLoading, onChangeRole, onBan, onUnban, isCh
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              {["User", "Email", "Role", "NIM", "Created", "Actions"].map((h, i) => (
-                <th key={i} className="px-6 py-3">
+              {["User", "Email", "Role", "NIM", "Created", "Actions"].map((_, index) => (
+                <th key={index} className="px-6 py-3">
                   <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded" />
                 </th>
               ))}

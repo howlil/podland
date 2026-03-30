@@ -4,14 +4,13 @@ import { Pin, PinOff, ArrowLeft, Server } from "lucide-react";
 interface VMHeaderProps {
   vm?: VM;
   isLoading?: boolean;
-  isPinned?: boolean;
   onPin?: () => void;
   onUnpin?: () => void;
   isPinning?: boolean;
   isUnpinning?: boolean;
 }
 
-export function VMHeader({ vm, isLoading, isPinned, onPin, onUnpin, isPinning, isUnpinning }: VMHeaderProps) {
+export function VMHeader({ vm, isLoading, onPin, onUnpin, isPinning, isUnpinning }: VMHeaderProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 animate-pulse">

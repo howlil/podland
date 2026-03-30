@@ -39,7 +39,6 @@ export default function VMDetailPage() {
         <VMHeader
           vm={vm}
           isLoading={isLoading}
-          isPinned={vm?.is_pinned}
           onPin={pinVM}
           onUnpin={unpinVM}
           isPinning={isPinning}

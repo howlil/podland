@@ -12,6 +12,7 @@ export interface VM {
   storage: number;
   status: "pending" | "running" | "stopped" | "error";
   domain?: string;
+  is_pinned?: boolean;
   created_at: string;
 }
 

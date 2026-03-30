@@ -30,5 +30,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // Code splitting optimization
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['@tanstack/react-router'],
+          query: ['@tanstack/react-query'],
+          ui: ['lucide-react', 'sonner'],
+        },
+      },
+    },
   },
 });

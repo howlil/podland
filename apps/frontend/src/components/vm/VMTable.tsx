@@ -57,12 +57,6 @@ export function VMTable({
           onStop={onStop}
           onRestart={onRestart}
           onDelete={onDelete}
-          onPin={onPin}
-          onUnpin={onUnpin}
-          isStarting={isStarting === vm.id}
-          isStopping={isStopping === vm.id}
-          isRestarting={isRestarting === vm.id}
-          isDeleting={isDeleting === vm.id}
         />
       ))}
     </div>

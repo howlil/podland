@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
 export const Route = createFileRoute('/admin-audit-log')({
-  component: AuditLogPage,
+  component: AdminAuditLogPage,
 })
 
 interface AuditLog {
@@ -16,7 +16,7 @@ interface AuditLog {
   created_at: string
 }
 
-function AuditLogPage() {
+export default function AdminAuditLogPage() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['admin-audit-log'],
     queryFn: async () => {

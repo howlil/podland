@@ -4,20 +4,15 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TabNav } from "@/components/observability/TabNav";
 import { MetricsDashboard } from "@/components/observability/MetricsDashboard";
 import { LogViewer } from "@/components/observability/LogViewer";
-import { Play, Square, Activity, FileText, AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 
 export default function ObservabilityPage() {
-  const [vmId, setVmId] = useState<string>("");
-
-  // For now, get vmId from query param or user input
-  // In production, this would come from route params
+  const [vmId] = useState<string>("");
   const {
     activeTab,
     setActiveTab,
-    timeRange,
-    setTimeRange,
     metrics,
-    logs,
+    timeRange,
     alerts,
     isLoading,
   } = useObservability(vmId);

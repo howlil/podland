@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 
 export const Route = createFileRoute('/admin-health')({
-  component: SystemHealthPage,
+  component: AdminHealthPage,
 })
 
-function SystemHealthPage() {
+export default function AdminHealthPage() {
   const { data: health, isLoading } = useQuery({
     queryKey: ['admin-health'],
     queryFn: async () => {

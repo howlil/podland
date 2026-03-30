@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { UserTable } from "@/components/admin/UserTable";
-import { Plus } from "lucide-react";
 
 export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -17,6 +16,10 @@ export default function AdminUsersPage() {
     isBanning,
     isUnbanning,
   } = useAdminUsers(roleFilter === "all" ? undefined : roleFilter);
+
+  const handleChangeRole = (userId: string, role: string) => {
+    changeRole({ userId, role });
+  };
 
   return (
     <DashboardLayout>
@@ -54,7 +57,7 @@ export default function AdminUsersPage() {
         <UserTable
           users={users}
           isLoading={isLoading}
-          onChangeRole={changeRole}
+          onChangeRole={handleChangeRole}
           onBan={banUser}
           onUnban={unbanUser}
           isChangingRole={isChangingRole}
