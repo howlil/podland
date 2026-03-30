@@ -1,0 +1,8 @@
+{
+  "pid": 12345,
+  "operation": "new-milestone",
+  "milestone": "v1.1",
+  "started_at": "2026-03-30T00:00:00.000Z",
+  "last_heartbeat": "2026-03-30T00:00:00.000Z",
+  "state": "gathering_goals"
+}

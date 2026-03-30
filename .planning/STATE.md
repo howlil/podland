@@ -1,13 +1,15 @@
 # Podland — State
 
-**Last Updated:** 2026-03-30  
-**Status:** ✅ v1.0 Complete — Ready for Production
+**Last Updated:** 2026-03-30
+**Status:** 🔄 v1.1 In Progress — Defining Requirements
 
 ---
 
 ## Current State
 
-**Shipped:** v1.0 — Foundation to Admin + Polish (2026-03-30)
+**Current Milestone:** v1.1 — Hardening & Polish
+
+**Previous:** v1.0 — Foundation to Admin + Polish ✅ SHIPPED (2026-03-30)
 
 **All 5 phases complete:**
 - ✅ Phase 1: Foundation
@@ -20,13 +22,22 @@
 
 ---
 
+## Current Position
+
+**Phase:** Not started (defining requirements)
+**Plan:** —
+**Status:** Defining requirements
+**Last activity:** 2026-03-30 — Milestone v1.1 started
+
+---
+
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-30)
 
 **Core value:** Students can deploy and run applications with zero DevOps knowledge
 
-**Current focus:** Production deployment + v1.1 planning
+**Current focus:** v1.1 — Hardening & Polish (security, compliance, a11y, performance, testing)
 
 ---
 
@@ -93,10 +104,10 @@ None — All blockers resolved
 
 ## Next Steps
 
-1. **Deploy to production** — Follow `docs/DEPLOYMENT.md`
-2. **Fix T+7 items** — Rate limiting, privacy policy
-3. **Plan v1.1** — Run `/ez:new-milestone`
+1. **Define requirements** — Scope v1.1 features with REQ-IDs
+2. **Create roadmap** — Phase structure for implementation
+3. **Execute** — Run `/ez:plan-phase [N]` to start
 
 ---
 
-*State updated: 2026-03-30 after v1.0 milestone completion*
+*State updated: 2026-03-30 after v1.1 milestone started*

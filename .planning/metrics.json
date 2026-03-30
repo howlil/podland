@@ -1,0 +1,16 @@
+{
+  "milestone": "v1.1",
+  "started_at": "2026-03-30T00:00:00.000Z",
+  "budget": {
+    "ceiling": 50.00,
+    "alert_threshold": 0.8,
+    "projected": 0.00,
+    "spent": 0.00
+  },
+  "phases": {},
+  "cumulative": {
+    "total_tokens": 0,
+    "total_cost_usd": 0.00,
+    "by_provider": {}
+  }
+}

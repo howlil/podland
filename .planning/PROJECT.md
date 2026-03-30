@@ -14,6 +14,20 @@
 
 ---
 
+## Current Milestone: v1.1 — Hardening & Polish
+
+**Goal:** Production hardening across security, compliance, accessibility, performance, and testing.
+
+**Target features:**
+- Rate limiting on auth endpoints + Privacy policy page (GDPR compliance)
+- Account deletion feature (GDPR right to erasure)
+- OpenAPI/Swagger documentation + User guides
+- WCAG AA compliance (color contrast, focus indicators, screen readers)
+- Lighthouse CI monitoring + Core Web Vitals optimization
+- Load testing execution + Integration/e2e testing
+
+---
+
 ## What This Is
 
 Podland is a multi-tenant PaaS (Platform as a Service) for students, built on a single bare-metal server managed by Proxmox. Users can deploy containerized applications ("VMs") with automatic resource allocation, domain setup via Cloudflare, and built-in observability. Authentication requires GitHub OAuth with @student.unand.ac.id email verification.
@@ -208,4 +222,4 @@ Students can deploy and run applications with zero DevOps knowledge — just cre
 
 ---
 
-*Last updated: 2026-03-30 after v1.0 milestone completion*
+*Last updated: 2026-03-30 after v1.1 milestone started*
