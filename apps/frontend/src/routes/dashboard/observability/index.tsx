@@ -1,15 +1,12 @@
 import { useState } from "react";
-import { useSearch } from "@tanstack/react-router";
 import { MetricsSummary } from "@/components/observability/MetricsSummary";
 import { LogViewer } from "@/components/observability/LogViewer";
 import { Activity, FileText, AlertTriangle, ExternalLink } from "lucide-react";
 
-interface ObservabilitySearch {
-  vm?: string;
-}
-
 export default function ObservabilityPage() {
-  const { vm: vmId } = useSearch<ObservabilitySearch>({ strict: false });
+  // Note: vmId should be passed via query param: ?vm=xxx
+  const params = new URLSearchParams(window.location.search);
+  const vmId = params.get("vm") || undefined;
   const [activeTab, setActiveTab] = useState<"metrics" | "logs" | "alerts">("metrics");
   const [timeRange, setTimeRange] = useState("24h");
 
@@ -124,7 +121,7 @@ export default function ObservabilityPage() {
         )}
 
         {activeTab === "alerts" && (
-          <AlertHistory vmId={vmId} />
+          <AlertHistory />
         )}
       </div>
     </div>
@@ -160,7 +157,7 @@ function TabButton({ icon: Icon, label, active, onClick, badge }: TabButtonProps
   );
 }
 
-function AlertHistory({ vmId }: { vmId: string }) {
+function AlertHistory() {
   // TODO: Implement alert history fetching
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">

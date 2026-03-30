@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CreateVMWizard } from "@/components/vm/CreateVMWizard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatBytes } from "@/lib/utils";
+import { POLLING_INTERVALS, VM_STATUS } from "@/lib/constants";
 
 interface VM {
   id: string;
@@ -12,7 +16,7 @@ interface VM {
   cpu: number;
   ram: number;
   storage: number;
-  status: "pending" | "running" | "stopped" | "error";
+  status: typeof VM_STATUS[keyof typeof VM_STATUS];
   domain: string;
   created_at: string;
 }
@@ -26,13 +30,14 @@ export default function VMsRoute() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
 
-  const { data: vms = [], isLoading, refetch } = useQuery<VM[]>({
+  const { data: vms = [], isLoading, error, refetch } = useQuery<VM[]>({
     queryKey: ["vms"],
     queryFn: async () => {
       const { data } = await api.get("/vms");
       return data;
     },
-    refetchInterval: 5000, // Poll every 5 seconds
+    refetchInterval: POLLING_INTERVALS.VM_STATUS,
+    retry: 2,
   });
 
   const queryClient = useQueryClient();
@@ -41,6 +46,10 @@ export default function VMsRoute() {
     mutationFn: (vmId: string) => api.post(`/vms/${vmId}/start`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vms"] });
+      toast.success("VM started successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to start VM: ${error.response?.data?.message || "Unknown error"}`);
     },
   });
 
@@ -48,6 +57,10 @@ export default function VMsRoute() {
     mutationFn: (vmId: string) => api.post(`/vms/${vmId}/stop`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vms"] });
+      toast.success("VM stopped successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to stop VM: ${error.response?.data?.message || "Unknown error"}`);
     },
   });
 
@@ -55,6 +68,10 @@ export default function VMsRoute() {
     mutationFn: (vmId: string) => api.post(`/vms/${vmId}/restart`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vms"] });
+      toast.success("VM restarted successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to restart VM: ${error.response?.data?.message || "Unknown error"}`);
     },
   });
 
@@ -62,31 +79,31 @@ export default function VMsRoute() {
     mutationFn: (vmId: string) => api.delete(`/vms/${vmId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vms"] });
+      toast.success("VM deleted successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete VM: ${error.response?.data?.message || "Unknown error"}`);
     },
   });
 
   const handleStart = (vmId: string) => {
-    if (confirm("Start this VM?")) {
-      startMutation.mutate(vmId);
-    }
+    toast.loading("Starting VM...", { id: `vm-${vmId}` });
+    startMutation.mutate(vmId);
   };
 
   const handleStop = (vmId: string) => {
-    if (confirm("Stop this VM?")) {
-      stopMutation.mutate(vmId);
-    }
+    toast.loading("Stopping VM...", { id: `vm-${vmId}` });
+    stopMutation.mutate(vmId);
   };
 
   const handleRestart = (vmId: string) => {
-    if (confirm("Restart this VM?")) {
-      restartMutation.mutate(vmId);
-    }
+    toast.loading("Restarting VM...", { id: `vm-${vmId}` });
+    restartMutation.mutate(vmId);
   };
 
   const handleDelete = (vmId: string) => {
-    if (confirm("Are you sure you want to delete this VM? This action cannot be undone.")) {
-      deleteMutation.mutate(vmId);
-    }
+    toast.loading("Deleting VM...", { id: `vm-${vmId}` });
+    deleteMutation.mutate(vmId);
   };
 
   const handleSort = (field: SortField) => {
@@ -111,14 +128,6 @@ export default function VMsRoute() {
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
     }
-  };
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   // Filter and sort VMs
@@ -184,47 +193,110 @@ export default function VMsRoute() {
         </div>
 
         {/* VM Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden" role="region" aria-label="VMs list">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th
+                  scope="col"
                   onClick={() => handleSort("name")}
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-100"
+                  aria-sort={sortField === "name" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSort("name");
+                    }
+                  }}
                 >
-                  Name {sortField === "name" && (sortOrder === "asc" ? "↑" : "↓")}
+                  <span className="flex items-center gap-1">
+                    Name
+                    {sortField === "name" && (
+                      <span aria-hidden="true">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                    )}
+                  </span>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   OS
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Tier
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Resources
                 </th>
                 <th
+                  scope="col"
                   onClick={() => handleSort("status")}
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-100"
+                  aria-sort={sortField === "status" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSort("status");
+                    }
+                  }}
                 >
-                  Status {sortField === "status" && (sortOrder === "asc" ? "↑" : "↓")}
+                  <span className="flex items-center gap-1">
+                    Status
+                    {sortField === "status" && (
+                      <span aria-hidden="true">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                    )}
+                  </span>
                 </th>
                 <th
+                  scope="col"
                   onClick={() => handleSort("created_at")}
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-100"
+                  aria-sort={sortField === "created_at" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSort("created_at");
+                    }
+                  }}
                 >
-                  Created {sortField === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                  <span className="flex items-center gap-1">
+                    Created
+                    {sortField === "created_at" && (
+                      <span aria-hidden="true">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                    )}
+                  </span>
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
+                // Skeleton loading state
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                    <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                    <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                    <td className="px-6 py-4"><Skeleton className="h-4 w-48" /></td>
+                    <td className="px-6 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                    <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                    <td className="px-6 py-4"><Skeleton className="h-8 w-32 ml-auto" /></td>
+                  </tr>
+                ))
+              ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                    Loading VMs...
+                  <td colSpan={7} className="px-6 py-8 text-center">
+                    <div className="text-red-600 dark:text-red-400">
+                      <p className="font-medium">Failed to load VMs</p>
+                      <button
+                        onClick={() => refetch()}
+                        className="mt-2 text-primary hover:text-primary/80 font-medium"
+                      >
+                        Try again
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : filteredVms.length === 0 ? (
@@ -268,36 +340,50 @@ export default function VMsRoute() {
                       {new Date(vm.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {vm.status === "stopped" && (
+                      <div className="flex items-center justify-end gap-2" role="group" aria-label={`Actions for ${vm.name}`}>
+                        {vm.status === "stopped" && (
+                          <button
+                            onClick={() => handleStart(vm.id)}
+                            disabled={startMutation.isPending}
+                            className="min-h-[44px] min-w-[44px] p-2 text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label={`Start ${vm.name}`}
+                            title="Start VM"
+                          >
+                            ▶
+                          </button>
+                        )}
+                        {vm.status === "running" && (
+                          <>
+                            <button
+                              onClick={() => handleStop(vm.id)}
+                              disabled={stopMutation.isPending}
+                              className="min-h-[44px] min-w-[44px] p-2 text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              aria-label={`Stop ${vm.name}`}
+                              title="Stop VM"
+                            >
+                              ⏹
+                            </button>
+                            <button
+                              onClick={() => handleRestart(vm.id)}
+                              disabled={restartMutation.isPending}
+                              className="min-h-[44px] min-w-[44px] p-2 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              aria-label={`Restart ${vm.name}`}
+                              title="Restart VM"
+                            >
+                              ↻
+                            </button>
+                          </>
+                        )}
                         <button
-                          onClick={() => handleStart(vm.id)}
-                          className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
+                          onClick={() => handleDelete(vm.id)}
+                          disabled={deleteMutation.isPending}
+                          className="min-h-[44px] min-w-[44px] p-2 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label={`Delete ${vm.name}`}
+                          title="Delete VM"
                         >
-                          Start
+                          🗑
                         </button>
-                      )}
-                      {vm.status === "running" && (
-                        <>
-                          <button
-                            onClick={() => handleStop(vm.id)}
-                            className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 mr-3"
-                          >
-                            Stop
-                          </button>
-                          <button
-                            onClick={() => handleRestart(vm.id)}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
-                          >
-                            Restart
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleDelete(vm.id)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Delete
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))

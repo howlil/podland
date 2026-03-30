@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { formatBytes } from "@/lib/utils";
+import { X } from "lucide-react";
 
 interface Tier {
   name: string;
@@ -148,16 +151,12 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
       setCreatedVM(data);
       setShowSSHKey(true);
       setStep(4);
+      toast.success("VM created successfully! Save your SSH key.");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to create VM: ${error.response?.data?.message || "Unknown error"}`);
     },
   });
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
 
   const checkQuota = (tier: Tier): { valid: boolean; message: string } => {
     if (!quota) return { valid: true, message: "" };
@@ -455,10 +454,10 @@ export function CreateVMWizard({ onClose, onSuccess }: CreateVMWizardProps) {
             <button
               ref={close_button_ref}
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               aria-label="Close create VM dialog"
             >
-              ✕
+              <X className="h-5 w-5" />
             </button>
           </div>
 
