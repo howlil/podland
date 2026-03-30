@@ -84,6 +84,55 @@ func Migrate(db *sql.DB) error {
 		// Composite index for efficient activity queries (filter by user, order by created_at)
 		`CREATE INDEX IF NOT EXISTS idx_activity_logs_user_created ON activity_logs(user_id, created_at DESC)`,
 
+		// Phase 2: VMs table
+		`CREATE TABLE IF NOT EXISTS vms (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id),
+			name VARCHAR(100) NOT NULL,
+			os VARCHAR(50) NOT NULL DEFAULT 'ubuntu-2204',
+			tier VARCHAR(20) NOT NULL,
+			cpu DECIMAL(4,2) NOT NULL,
+			ram BIGINT NOT NULL,
+			storage BIGINT NOT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			k8s_namespace VARCHAR(100),
+			k8s_deployment VARCHAR(100),
+			k8s_service VARCHAR(100),
+			k8s_pvc VARCHAR(100),
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			started_at TIMESTAMP,
+			stopped_at TIMESTAMP,
+			deleted_at TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_user_id ON vms(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_status ON vms(status)`,
+
+		// Phase 2: User quotas table
+		`CREATE TABLE IF NOT EXISTS user_quotas (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			cpu_limit DECIMAL(4,2) NOT NULL,
+			ram_limit BIGINT NOT NULL,
+			storage_limit BIGINT NOT NULL,
+			vm_count_limit INTEGER NOT NULL DEFAULT 3,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_user_quotas_user_id ON user_quotas(user_id)`,
+
+		// Phase 2: Quota usage table
+		`CREATE TABLE IF NOT EXISTS quota_usage (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			cpu_used DECIMAL(4,2) NOT NULL DEFAULT 0,
+			ram_used BIGINT NOT NULL DEFAULT 0,
+			storage_used BIGINT NOT NULL DEFAULT 0,
+			vm_count INTEGER NOT NULL DEFAULT 0,
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_quota_usage_user_id ON quota_usage(user_id)`,
+
 		// Updated_at trigger for users
 		`CREATE OR REPLACE FUNCTION update_updated_at_column()
 			RETURNS TRIGGER AS $$

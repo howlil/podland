@@ -31,12 +31,12 @@ func checkRequiredEnvVars() {
 		"JWT_SECRET",
 		"GITHUB_CLIENT_ID",
 		"GITHUB_CLIENT_SECRET",
-		"CLOUDFLARE_API_TOKEN",
-		"CLOUDFLARE_ZONE_ID",
-		"ALERTMANAGER_WEBHOOK_SECRET",
-		"SENDGRID_API_KEY",
-		"SENDGRID_FROM_EMAIL",
 	}
+
+	// Optional (only required for specific features)
+	// - CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID: Domain automation
+	// - ALERTMANAGER_WEBHOOK_SECRET: Monitoring alerts
+	// - SENDGRID_API_KEY, SENDGRID_FROM_EMAIL: Email notifications
 
 	missing := []string{}
 	for _, env := range required {
@@ -207,7 +207,8 @@ func main() {
 	r.Post("/api/alerts/webhook", alertWebhookHandler.HandleAlert)
 
 	// Metrics, logs, and notifications routes (protected)
-	r.Route("/api/vms", func(r chi.Router) {
+	// These are nested under /api/vms/{id} for specific VM operations
+	r.Route("/api/vms/{id}", func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				middleware.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -215,11 +216,11 @@ func main() {
 				})(w, r)
 			})
 		})
-		r.Get("/{id}/metrics", metricsHandler.GetVMMetrics)
-		r.Get("/{id}/metrics/detail", metricsHandler.RedirectToGrafana)
-		r.Get("/{id}/logs", logsHandler.GetVMLogs)
-		r.Get("/{id}/logs/stream", logsHandler.StreamVMLogs)
-		r.Get("/{id}/alerts", alertWebhookHandler.GetVMAlerts)
+		r.Get("/metrics", metricsHandler.GetVMMetrics)
+		r.Get("/metrics/detail", metricsHandler.RedirectToGrafana)
+		r.Get("/logs", logsHandler.GetVMLogs)
+		r.Get("/logs/stream", logsHandler.StreamVMLogs)
+		r.Get("/alerts", alertWebhookHandler.GetVMAlerts)
 	})
 
 	// Notifications routes (protected)
